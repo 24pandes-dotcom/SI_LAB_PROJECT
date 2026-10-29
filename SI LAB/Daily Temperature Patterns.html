@@ -1,0 +1,585 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Daily Temperature Patterns</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: weather-station logbook. Sticky tab strip over a single flowing column of panels; tiles and charts sit on a wrapping grid. */
+:root{
+  --bg:#f2f5f8;--surface:#ffffff;--surface-2:#eaf0f5;--ink:#14202b;--muted:#566877;--line:#d9e1e8;
+  --accent:#d4491c;--accent-ink:#ffffff;--cool:#2b6cb0;--good:#1f7a4d;--bad:#c0392b;
+  --c-winter:#2b6cb0;--c-summer:#d98a1b;--c-monsoon:#17877a;--c-post:#8e5ab8;
+  --font-display:'Bricolage Grotesque','Segoe UI',system-ui,sans-serif;
+  --font-body:'IBM Plex Sans','Segoe UI',system-ui,sans-serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f171e;--surface:#17212a;--surface-2:#1e2b36;--ink:#e6edf3;--muted:#93a4b3;--line:#2a3844;
+  --accent:#ff7a4d;--accent-ink:#1a0d07;--cool:#6aa6e8;--good:#4cc38a;--bad:#ff7b6b;
+  --c-winter:#6aa6e8;--c-summer:#f0b24a;--c-monsoon:#3fc3b0;--c-post:#b98ae0;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f171e;--surface:#17212a;--surface-2:#1e2b36;--ink:#e6edf3;--muted:#93a4b3;--line:#2a3844;
+  --accent:#ff7a4d;--accent-ink:#1a0d07;--cool:#6aa6e8;--good:#4cc38a;--bad:#ff7b6b;
+  --c-winter:#6aa6e8;--c-summer:#f0b24a;--c-monsoon:#3fc3b0;--c-post:#b98ae0;color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 48px}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.wrap{max-width:1180px;margin:0 auto}
+header.top{padding-block:28px 18px;display:flex;flex-wrap:wrap;gap:12px 32px;align-items:flex-end;justify-content:space-between}
+.eyebrow{font-family:var(--font-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+h1{font-family:var(--font-display);font-weight:700;font-size:clamp(30px,5vw,48px);line-height:1.05;margin:6px 0 0;letter-spacing:-.02em;text-wrap:balance}
+h1 span{color:var(--accent)}
+.meta{font-family:var(--font-mono);font-size:12px;color:var(--muted);text-align:right;line-height:1.7}
+nav.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:9;background:var(--bg);border-bottom:1px solid var(--line);
+  display:flex;gap:4px;overflow-x:auto;padding-block:8px;margin-bottom:22px}
+nav.tabs a{flex:0 0 auto;padding:8px 14px;border-radius:6px;color:var(--muted);text-decoration:none;font-weight:500;font-size:14px;border:1px solid transparent}
+nav.tabs a:hover{color:var(--ink);background:var(--surface-2)}
+nav.tabs a[aria-current="page"]{color:var(--accent-ink);background:var(--accent)}
+nav.tabs a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+section.view{display:flex;flex-direction:column;gap:18px}
+.lead{margin:0 0 4px;color:var(--muted);max-width:72ch}
+h2{font-family:var(--font-display);font-size:clamp(22px,3vw,30px);margin:0 0 2px;letter-spacing:-.01em}
+h3{font-family:var(--font-display);font-size:18px;margin:0 0 10px;letter-spacing:-.005em}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;min-width:0}
+.panel p.hint{margin:0 0 12px;color:var(--muted);font-size:13.5px}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:18px}
+.cols>*{min-width:0}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.tile .k{font-family:var(--font-mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.tile .v{font-family:var(--font-display);font-size:30px;font-weight:700;line-height:1.15;font-variant-numeric:tabular-nums}
+.tile .v small{font-size:14px;font-weight:600;color:var(--muted);margin-left:3px}
+.tile .s{font-size:12.5px;color:var(--muted)}
+.tile.hot .v{color:var(--accent)}
+.chart{position:relative;height:320px}
+.chart.tall{height:380px}
+.chart.short{height:260px}
+.controls{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:flex-end;margin-bottom:14px}
+.ctl{display:flex;flex-direction:column;gap:4px;min-width:0}
+.ctl label,.ctl .lab{font-family:var(--font-mono);font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+select,button.btn{font:inherit;font-size:14px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 10px;max-width:100%}
+button.btn{cursor:pointer;font-weight:500}
+button.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button.btn:hover{border-color:var(--muted)}
+input[type=range]{accent-color:var(--accent);width:100%;min-width:140px}
+.checks{display:flex;flex-wrap:wrap;gap:8px 14px}
+.checks label{display:flex;gap:6px;align-items:center;font-size:14px;text-transform:none;letter-spacing:0;font-family:var(--font-body);color:var(--ink)}
+.scroll{overflow-x:auto;max-width:100%}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{padding:7px 10px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap;font-variant-numeric:tabular-nums}
+th:first-child,td:first-child{text-align:left}
+th{font-family:var(--font-mono);font-weight:500;font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+td.num,td{font-family:var(--font-mono);font-size:13px}
+td:first-child{font-family:var(--font-body);font-size:13.5px}
+tr:last-child td{border-bottom:0}
+.heat td{text-align:center;min-width:56px}
+.pill{display:inline-block;font-family:var(--font-mono);font-size:12px;padding:2px 8px;border-radius:99px;border:1px solid var(--line);background:var(--surface-2)}
+.pill.good{color:var(--good);border-color:var(--good)}
+.pill.bad{color:var(--bad);border-color:var(--bad)}
+.callout{background:var(--surface-2);border-radius:8px;padding:12px 14px;font-size:14px;margin-top:12px}
+.callout b{font-weight:600}
+.list{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:baseline}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--muted);margin-bottom:8px}
+.whatif{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px 20px;margin-bottom:12px}
+.whatif output{font-family:var(--font-mono);font-size:13px;color:var(--ink);float:right}
+.big{font-family:var(--font-display);font-size:40px;font-weight:700;color:var(--accent);line-height:1.1;font-variant-numeric:tabular-nums}
+footer{margin-top:34px;font-size:12.5px;color:var(--muted);font-family:var(--font-mono);border-top:1px solid var(--line);padding-top:14px}
+svg text{font-family:var(--font-mono);font-size:11px;fill:var(--muted)}
+@media (max-width:520px){.panel{padding:14px}.meta{text-align:left}.chart,.chart.tall{height:280px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="eyebrow">Weather analysis · 365 daily observations</div>
+      <h1>Daily Temperature <span>Patterns</span></h1>
+    </div>
+    <div class="meta">1 Jan – 31 Dec 2025<br>13 variables · 4 seasons<br>Temperatures in °C</div>
+  </header>
+
+  <nav class="tabs" id="tabs" aria-label="Dashboard sections">
+    <a href="#overview">Overview</a>
+    <a href="#trends">Trends</a>
+    <a href="#seasons">Seasons</a>
+    <a href="#relationships">Relationships</a>
+    <a href="#statistics">Statistics</a>
+    <a href="#sampling">Sampling &amp; CI</a>
+    <a href="#prediction">Prediction</a>
+  </nav>
+
+  <!-- OVERVIEW -->
+  <section class="view" id="v-overview" hidden>
+    <div><h2>Year at a glance</h2><p class="lead">Headline numbers for 2025, the daily temperature record with a 7-day average, and the spread of each month.</p></div>
+    <div class="tiles" id="ovTiles"></div>
+    <div class="panel"><h3>Daily temperature</h3><p class="hint">Tap legend items to show or hide a line. Hover for exact values.</p><div class="chart tall"><canvas id="chOvDaily"></canvas></div></div>
+    <div class="panel"><h3>Monthly range and mean</h3><p class="hint">Bars span the coldest to hottest day of each month. The line is the monthly mean.</p><div class="chart"><canvas id="chOvMonthly"></canvas></div></div>
+    <div class="panel"><h3>What stands out</h3><ul class="list" id="ovInsights"></ul></div>
+  </section>
+
+  <!-- TRENDS -->
+  <section class="view" id="v-trends" hidden>
+    <div><h2>Trends over time</h2><p class="lead">Pick any measurement and smooth it with a moving average to see the slow movement under the daily noise.</p></div>
+    <div class="panel">
+      <div class="controls">
+        <div class="ctl"><label for="trVar">Variable</label><select id="trVar"></select></div>
+        <div class="ctl"><label for="trWin">Moving average</label><select id="trWin"><option value="1">None</option><option value="7" selected>7 days</option><option value="14">14 days</option><option value="30">30 days</option></select></div>
+      </div>
+      <div class="chart tall"><canvas id="chTrend"></canvas></div>
+    </div>
+    <div class="cols">
+      <div class="panel"><h3>Monthly rainfall</h3><p class="hint">Total millimetres per month.</p><div class="chart short"><canvas id="chRain"></canvas></div></div>
+      <div class="panel"><h3>Rainy days per month</h3><p class="hint">Days with any measured rainfall.</p><div class="chart short"><canvas id="chRainDays"></canvas></div></div>
+    </div>
+    <div class="panel"><h3>Monthly averages</h3><div class="scroll"><table id="trTable"></table></div></div>
+  </section>
+
+  <!-- SEASONS -->
+  <section class="view" id="v-seasons" hidden>
+    <div><h2>Seasons and day types</h2><p class="lead">How each season and weekdays versus weekends differ, with 95% confidence intervals around each mean.</p></div>
+    <div class="panel">
+      <div class="controls"><div class="ctl"><label for="seVar">Variable</label><select id="seVar"></select></div></div>
+      <div class="cols">
+        <div><h3>Season means with 95% CI</h3><div class="chart short"><canvas id="chSeason"></canvas></div></div>
+        <div><h3>Season summary</h3><div class="scroll"><table id="seTable"></table></div><h3 style="margin-top:18px">Weekday vs weekend</h3><div class="scroll"><table id="dtTable"></table></div></div>
+      </div>
+    </div>
+    <div class="panel"><h3>Season profile, all variables</h3><p class="hint">Mean daily value of every measurement in each season.</p><div class="scroll"><table id="seProfile"></table></div></div>
+    <div class="panel"><h3>Season by season</h3><div class="chart"><canvas id="chSeasonBox"></canvas></div><p class="hint" style="margin:10px 0 0">Daily temperature for every day, grouped by season. Each dot is one day.</p></div>
+  </section>
+
+  <!-- RELATIONSHIPS -->
+  <section class="view" id="v-relationships" hidden>
+    <div><h2>Weather relationships</h2><p class="lead">Pearson correlations between every pair of measurements, and a scatter plot with a fitted line for any pair you choose.</p></div>
+    <div class="panel"><h3>Correlation matrix</h3><p class="hint">Orange cells move together, blue cells move in opposite directions. Pairs use days where both values exist.</p><div class="scroll"><table class="heat" id="heat"></table></div></div>
+    <div class="panel"><h3>Strongest relationships</h3><ul class="list" id="topCorr"></ul></div>
+    <div class="panel">
+      <div class="controls">
+        <div class="ctl"><label for="scX">X axis</label><select id="scX"></select></div>
+        <div class="ctl"><label for="scY">Y axis</label><select id="scY"></select></div>
+      </div>
+      <div class="legend" id="scLegend"></div>
+      <div class="chart tall"><canvas id="chScatter"></canvas></div>
+      <div class="callout" id="scStats"></div>
+    </div>
+  </section>
+
+  <!-- STATISTICS -->
+  <section class="view" id="v-statistics" hidden>
+    <div><h2>Statistical analysis</h2><p class="lead">Descriptive statistics, the shape of each distribution, and formal tests for differences between day types and seasons.</p></div>
+    <div class="panel"><h3>Descriptive statistics</h3><div class="scroll"><table id="descTable"></table></div></div>
+    <div class="panel">
+      <div class="controls">
+        <div class="ctl"><label for="stVar">Variable</label><select id="stVar"></select></div>
+        <div class="ctl" style="min-width:180px"><label for="stBins">Histogram bins: <span id="stBinsOut">15</span></label><input type="range" id="stBins" min="5" max="30" value="15"></div>
+      </div>
+      <div class="cols">
+        <div><h3>Distribution</h3><p class="hint">Bars are observed counts. The line is the count a normal distribution with the same mean and spread would give.</p><div class="chart short"><canvas id="chHist"></canvas></div></div>
+        <div><h3>Shape and normality</h3><div id="normBox"></div></div>
+      </div>
+    </div>
+    <div class="cols">
+      <div class="panel"><h3>Weekday vs weekend (Welch t-test)</h3><div id="ttestBox"></div></div>
+      <div class="panel"><h3>Across seasons (one-way ANOVA)</h3><div id="anovaBox"></div></div>
+    </div>
+  </section>
+
+  <!-- SAMPLING -->
+  <section class="view" id="v-sampling" hidden>
+    <div><h2>Sampling and confidence intervals</h2><p class="lead">Draw a sample of days from the 365-day record, estimate the true mean from it, and check how often the interval captures the truth. The full year is the population here, so you can see exactly how each method behaves.</p></div>
+    <div class="panel">
+      <div class="controls">
+        <div class="ctl"><label for="sMethod">Sampling method</label><select id="sMethod"><option value="srs">Simple random</option><option value="sys">Systematic (every k-th day)</option><option value="strat">Stratified by season</option></select></div>
+        <div class="ctl"><label for="sVar">Variable</label><select id="sVar"></select></div>
+        <div class="ctl"><label for="sConf">Confidence level</label><select id="sConf"><option value="0.90">90%</option><option value="0.95" selected>95%</option><option value="0.99">99%</option></select></div>
+        <div class="ctl" style="min-width:200px"><label for="sN">Sample size: <span id="sNOut">40</span> days</label><input type="range" id="sN" min="10" max="200" step="5" value="40"></div>
+        <div class="ctl"><button class="btn primary" id="sDraw" type="button">Draw new sample</button></div>
+      </div>
+      <div class="tiles" id="sTiles"></div>
+      <div class="legend" style="margin-top:14px"><span><span class="sw" style="background:var(--muted);opacity:.5"></span>All 365 days</span><span><span class="sw" style="background:var(--accent)"></span>Days in your sample</span></div>
+      <div class="chart"><canvas id="chSample"></canvas></div>
+      <div class="callout" id="sNote"></div>
+    </div>
+    <div class="cols">
+      <div class="panel"><h3>Do the intervals hold up?</h3><p class="hint" id="covHint"></p><div id="covBox"></div></div>
+      <div class="panel"><h3>Comparing the three methods</h3><p class="hint">Each method run 1,000 times at your sample size. Lower spread means a more precise estimate.</p><div class="scroll"><table id="methTable"></table></div><div class="callout" id="methNote"></div></div>
+    </div>
+    <div class="panel"><h3>Proportion of rainy days</h3><p class="hint">Estimated from the same sample using the Wilson interval, which stays reliable for proportions near 0 or 1.</p><div id="propBox"></div></div>
+  </section>
+
+  <!-- PREDICTION -->
+  <section class="view" id="v-prediction" hidden>
+    <div><h2>Predictive analysis</h2><p class="lead">A multiple linear regression learns from 80% of the days and is scored on the 20% it never saw. Then try your own weather conditions. A separate model forecasts the next day from recent temperatures.</p></div>
+    <div class="panel">
+      <div class="controls">
+        <div class="ctl"><label for="pdTarget">Predict</label><select id="pdTarget"></select></div>
+        <div class="ctl"><span class="lab">Using</span><div class="checks" id="pdFeats"></div></div>
+        <div class="ctl"><button class="btn" id="pdSplit" type="button">New random split</button></div>
+      </div>
+      <div class="tiles" id="pdTiles"></div>
+    </div>
+    <div class="cols">
+      <div class="panel"><h3>Predicted vs actual (unseen days)</h3><p class="hint">Points on the diagonal are perfect predictions.</p><div class="chart"><canvas id="chPred"></canvas></div></div>
+      <div class="panel"><h3>Model coefficients</h3><p class="hint">Fitted on training days. Standardized beta compares influence across variables with different units.</p><div class="scroll"><table id="pdCoef"></table></div></div>
+    </div>
+    <div class="panel"><h3>What-if predictor</h3><p class="hint">Set the conditions and read the predicted value with a 95% prediction interval.</p><div class="whatif" id="wiBox"></div><div id="wiOut"></div></div>
+    <div class="panel">
+      <h3>Next-day temperature forecast</h3>
+      <p class="hint">Trained on the first 80% of the year, tested on the final 20% (October to December), in time order. The autoregressive model uses the previous three days.</p>
+      <div class="cols">
+        <div><div class="chart short"><canvas id="chFc"></canvas></div></div>
+        <div><div class="scroll"><table id="fcTable"></table></div><div class="callout" id="fcNote"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <footer>Source: daily_temperature_patterns.csv · 365 rows · Temperature_Change is blank on 1 Jan 2025 and excluded where it applies.</footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+const D={"Date":["2025-01-01","2025-01-02","2025-01-03","2025-01-04","2025-01-05","2025-01-06","2025-01-07","2025-01-08","2025-01-09","2025-01-10","2025-01-11","2025-01-12","2025-01-13","2025-01-14","2025-01-15","2025-01-16","2025-01-17","2025-01-18","2025-01-19","2025-01-20","2025-01-21","2025-01-22","2025-01-23","2025-01-24","2025-01-25","2025-01-26","2025-01-27","2025-01-28","2025-01-29","2025-01-30","2025-01-31","2025-02-01","2025-02-02","2025-02-03","2025-02-04","2025-02-05","2025-02-06","2025-02-07","2025-02-08","2025-02-09","2025-02-10","2025-02-11","2025-02-12","2025-02-13","2025-02-14","2025-02-15","2025-02-16","2025-02-17","2025-02-18","2025-02-19","2025-02-20","2025-02-21","2025-02-22","2025-02-23","2025-02-24","2025-02-25","2025-02-26","2025-02-27","2025-02-28","2025-03-01","2025-03-02","2025-03-03","2025-03-04","2025-03-05","2025-03-06","2025-03-07","2025-03-08","2025-03-09","2025-03-10","2025-03-11","2025-03-12","2025-03-13","2025-03-14","2025-03-15","2025-03-16","2025-03-17","2025-03-18","2025-03-19","2025-03-20","2025-03-21","2025-03-22","2025-03-23","2025-03-24","2025-03-25","2025-03-26","2025-03-27","2025-03-28","2025-03-29","2025-03-30","2025-03-31","2025-04-01","2025-04-02","2025-04-03","2025-04-04","2025-04-05","2025-04-06","2025-04-07","2025-04-08","2025-04-09","2025-04-10","2025-04-11","2025-04-12","2025-04-13","2025-04-14","2025-04-15","2025-04-16","2025-04-17","2025-04-18","2025-04-19","2025-04-20","2025-04-21","2025-04-22","2025-04-23","2025-04-24","2025-04-25","2025-04-26","2025-04-27","2025-04-28","2025-04-29","2025-04-30","2025-05-01","2025-05-02","2025-05-03","2025-05-04","2025-05-05","2025-05-06","2025-05-07","2025-05-08","2025-05-09","2025-05-10","2025-05-11","2025-05-12","2025-05-13","2025-05-14","2025-05-15","2025-05-16","2025-05-17","2025-05-18","2025-05-19","2025-05-20","2025-05-21","2025-05-22","2025-05-23","2025-05-24","2025-05-25","2025-05-26","2025-05-27","2025-05-28","2025-05-29","2025-05-30","2025-05-31","2025-06-01","2025-06-02","2025-06-03","2025-06-04","2025-06-05","2025-06-06","2025-06-07","2025-06-08","2025-06-09","2025-06-10","2025-06-11","2025-06-12","2025-06-13","2025-06-14","2025-06-15","2025-06-16","2025-06-17","2025-06-18","2025-06-19","2025-06-20","2025-06-21","2025-06-22","2025-06-23","2025-06-24","2025-06-25","2025-06-26","2025-06-27","2025-06-28","2025-06-29","2025-06-30","2025-07-01","2025-07-02","2025-07-03","2025-07-04","2025-07-05","2025-07-06","2025-07-07","2025-07-08","2025-07-09","2025-07-10","2025-07-11","2025-07-12","2025-07-13","2025-07-14","2025-07-15","2025-07-16","2025-07-17","2025-07-18","2025-07-19","2025-07-20","2025-07-21","2025-07-22","2025-07-23","2025-07-24","2025-07-25","2025-07-26","2025-07-27","2025-07-28","2025-07-29","2025-07-30","2025-07-31","2025-08-01","2025-08-02","2025-08-03","2025-08-04","2025-08-05","2025-08-06","2025-08-07","2025-08-08","2025-08-09","2025-08-10","2025-08-11","2025-08-12","2025-08-13","2025-08-14","2025-08-15","2025-08-16","2025-08-17","2025-08-18","2025-08-19","2025-08-20","2025-08-21","2025-08-22","2025-08-23","2025-08-24","2025-08-25","2025-08-26","2025-08-27","2025-08-28","2025-08-29","2025-08-30","2025-08-31","2025-09-01","2025-09-02","2025-09-03","2025-09-04","2025-09-05","2025-09-06","2025-09-07","2025-09-08","2025-09-09","2025-09-10","2025-09-11","2025-09-12","2025-09-13","2025-09-14","2025-09-15","2025-09-16","2025-09-17","2025-09-18","2025-09-19","2025-09-20","2025-09-21","2025-09-22","2025-09-23","2025-09-24","2025-09-25","2025-09-26","2025-09-27","2025-09-28","2025-09-29","2025-09-30","2025-10-01","2025-10-02","2025-10-03","2025-10-04","2025-10-05","2025-10-06","2025-10-07","2025-10-08","2025-10-09","2025-10-10","2025-10-11","2025-10-12","2025-10-13","2025-10-14","2025-10-15","2025-10-16","2025-10-17","2025-10-18","2025-10-19","2025-10-20","2025-10-21","2025-10-22","2025-10-23","2025-10-24","2025-10-25","2025-10-26","2025-10-27","2025-10-28","2025-10-29","2025-10-30","2025-10-31","2025-11-01","2025-11-02","2025-11-03","2025-11-04","2025-11-05","2025-11-06","2025-11-07","2025-11-08","2025-11-09","2025-11-10","2025-11-11","2025-11-12","2025-11-13","2025-11-14","2025-11-15","2025-11-16","2025-11-17","2025-11-18","2025-11-19","2025-11-20","2025-11-21","2025-11-22","2025-11-23","2025-11-24","2025-11-25","2025-11-26","2025-11-27","2025-11-28","2025-11-29","2025-11-30","2025-12-01","2025-12-02","2025-12-03","2025-12-04","2025-12-05","2025-12-06","2025-12-07","2025-12-08","2025-12-09","2025-12-10","2025-12-11","2025-12-12","2025-12-13","2025-12-14","2025-12-15","2025-12-16","2025-12-17","2025-12-18","2025-12-19","2025-12-20","2025-12-21","2025-12-22","2025-12-23","2025-12-24","2025-12-25","2025-12-26","2025-12-27","2025-12-28","2025-12-29","2025-12-30","2025-12-31"],"Temperature":[21.0,18.0,21.9,22.3,15.9,17.3,20.4,19.4,20.1,18.2,22.0,21.8,20.2,22.5,21.0,18.1,20.8,17.9,21.9,19.9,19.6,18.5,22.7,19.7,19.1,19.3,21.2,20.9,21.0,21.1,24.9,19.3,19.1,18.5,21.6,22.8,20.1,18.5,18.6,21.9,22.1,21.8,19.1,21.2,21.0,21.2,22.7,21.4,22.4,21.1,21.7,22.5,18.0,20.5,20.3,20.0,20.9,24.8,19.7,23.8,18.1,21.1,22.3,23.3,23.7,23.9,21.5,21.4,24.3,22.1,19.8,20.2,20.8,24.0,23.3,24.7,22.3,23.7,24.8,22.9,24.7,22.3,23.1,23.1,21.5,25.3,23.3,24.4,25.6,25.6,26.2,24.7,24.1,24.9,21.5,22.1,22.5,23.4,26.6,23.8,25.1,28.9,25.4,27.9,24.3,26.1,24.5,26.0,28.7,23.2,28.1,27.8,26.1,24.3,27.8,26.6,28.4,28.0,31.6,27.7,26.1,28.8,29.0,31.7,30.6,29.7,32.2,26.5,27.8,27.3,28.6,26.6,31.1,29.3,26.7,27.8,30.8,32.1,34.7,36.9,31.5,28.5,26.1,31.5,29.2,30.1,29.8,30.9,33.7,31.8,31.2,29.4,28.0,30.7,31.8,35.9,32.3,34.3,31.1,29.7,30.3,30.9,37.2,30.8,34.5,30.8,34.9,33.7,32.6,32.9,31.6,34.1,32.2,30.5,30.5,33.7,36.9,33.8,33.2,34.2,36.5,34.1,32.8,36.1,34.7,37.1,34.2,31.1,30.8,37.5,37.7,33.5,33.1,37.2,31.5,32.0,35.4,33.1,34.0,33.6,34.7,37.1,34.2,35.4,29.5,33.9,32.1,31.3,32.0,33.2,35.9,31.0,33.9,32.8,33.1,36.0,34.9,36.7,33.3,32.1,33.1,34.1,33.9,31.1,33.6,33.9,38.9,37.4,31.3,32.5,29.9,31.7,33.7,35.6,31.3,31.4,28.0,32.3,30.2,31.3,30.5,32.1,28.4,29.0,36.8,29.2,29.5,35.9,38.2,29.1,30.8,32.3,35.2,29.1,30.7,32.8,32.0,30.1,30.5,27.7,30.1,29.9,30.9,29.1,31.2,32.3,30.3,30.7,29.9,29.7,28.0,30.1,29.1,33.8,32.6,29.8,27.2,26.3,31.2,29.1,29.4,24.4,30.2,29.0,25.5,26.8,28.3,27.7,26.8,27.1,26.6,27.4,30.2,21.2,26.2,27.0,27.1,25.5,22.4,26.8,29.8,22.5,27.7,24.9,25.4,23.1,24.6,28.0,26.3,28.7,27.4,25.7,28.4,25.4,26.2,23.6,24.3,22.5,26.1,21.2,25.4,23.2,26.1,25.1,27.3,24.8,19.6,22.9,20.3,21.7,26.0,24.0,21.0,20.2,22.4,19.6,20.7,22.8,24.5,23.2,16.8,22.4,21.8,22.5,25.1,16.9,20.1,22.6,17.7,24.4,21.9,22.9,19.7,22.7,23.2,21.3,21.3,21.3,18.7,20.3,20.2,21.3,22.6,18.1,20.1],"Feels_Like_Temperature":[21.8,18.9,20.8,21.7,15.0,17.8,20.3,19.8,21.3,18.3,23.3,21.8,20.5,23.7,20.7,18.5,22.4,18.1,20.8,20.3,18.9,20.2,24.0,20.4,19.2,18.8,22.2,20.8,21.7,22.4,24.7,19.4,18.6,18.2,20.3,23.7,22.0,20.4,17.6,23.0,23.5,21.7,19.9,19.3,21.1,20.3,22.5,20.3,23.4,22.2,21.5,22.3,17.1,20.7,20.6,19.2,21.3,24.6,18.8,23.4,19.3,22.2,23.1,23.7,23.2,23.9,22.1,21.3,24.4,22.2,20.5,20.9,18.5,25.1,21.4,24.4,23.6,23.9,24.4,22.2,25.3,21.4,24.2,23.8,21.0,25.0,22.9,26.1,27.1,24.5,26.2,24.6,25.1,24.2,23.1,22.6,21.7,22.6,25.5,22.7,25.3,28.0,24.5,28.2,22.9,25.8,24.0,25.5,30.6,23.8,28.4,26.9,25.4,24.8,28.0,27.6,28.1,28.0,31.5,28.0,25.8,28.6,29.2,30.9,31.4,30.4,32.4,26.3,28.8,27.3,28.9,26.3,32.5,27.8,27.1,26.9,31.4,33.2,34.7,36.1,31.0,29.5,26.3,30.8,29.3,30.0,29.3,30.5,32.7,32.5,31.9,29.9,28.8,31.3,32.7,35.8,32.1,34.4,33.0,30.0,29.8,31.8,37.5,29.9,36.0,30.7,33.7,34.6,33.4,31.5,33.4,34.5,32.7,31.2,30.5,33.3,36.1,34.4,33.7,34.2,35.8,34.4,32.5,35.3,33.8,37.7,32.4,31.5,31.3,38.5,37.2,33.9,32.5,36.9,32.0,31.7,36.4,32.4,34.1,34.8,35.6,38.6,33.5,34.5,28.9,34.0,32.6,31.6,31.0,34.0,34.5,32.5,36.7,33.1,33.8,34.9,33.2,36.1,32.2,31.3,35.2,34.0,34.0,31.1,34.1,34.3,38.9,38.4,30.8,32.0,28.8,30.1,33.8,35.7,29.8,31.6,28.1,31.1,29.5,31.6,31.1,31.6,28.9,29.4,37.6,29.0,29.4,35.0,38.7,29.2,31.0,32.7,36.0,29.2,31.9,33.5,31.5,28.9,31.7,28.3,28.7,29.4,32.1,28.7,30.2,34.1,30.5,30.0,29.6,30.1,28.5,31.0,29.1,34.5,32.6,29.6,27.7,27.4,32.1,29.6,29.6,24.3,29.9,29.3,25.8,29.4,28.0,28.8,27.5,27.6,28.9,27.1,30.7,21.3,26.1,26.9,28.0,25.8,23.6,27.0,29.2,24.5,28.4,24.5,24.3,22.9,25.7,27.7,26.3,29.2,28.3,26.0,27.9,26.0,26.9,24.5,24.1,23.8,25.6,21.0,24.8,24.8,27.3,25.7,28.4,27.4,18.6,22.9,19.5,21.1,25.2,23.3,20.1,20.6,22.7,20.7,21.4,23.2,24.5,25.6,17.1,21.0,21.6,21.4,25.6,17.3,20.3,24.2,18.6,25.2,21.1,21.9,20.4,23.1,21.7,21.5,22.0,20.7,18.0,19.9,20.9,21.9,23.7,19.0,19.9],"Humidity":[81.2,65.0,62.2,70.2,78.9,71.4,80.2,77.0,76.6,75.3,87.4,67.2,53.7,81.3,65.6,71.7,79.9,58.2,58.8,57.1,63.7,74.2,72.6,72.2,59.0,51.8,69.6,65.6,73.0,74.9,68.3,76.3,72.2,74.9,63.3,66.9,71.4,77.2,67.5,73.0,66.5,67.9,77.0,53.3,58.9,57.3,49.7,63.7,74.5,66.9,70.5,77.2,81.6,69.0,80.5,70.6,62.7,62.4,58.2,60.6,68.0,75.7,82.4,57.0,71.0,59.4,72.8,68.1,52.8,76.1,65.1,65.4,60.8,62.4,71.4,65.8,71.2,70.7,77.8,65.5,55.5,77.1,65.5,77.0,72.1,65.9,70.8,83.0,83.4,67.3,67.7,75.9,60.9,69.8,68.8,71.2,61.8,55.3,49.7,58.8,63.4,62.6,82.4,74.4,59.8,69.3,64.1,64.3,66.5,73.0,62.7,74.1,57.4,67.5,86.4,68.0,76.7,66.2,68.1,65.2,65.2,58.8,68.3,56.6,69.3,73.2,66.1,64.0,69.2,63.4,72.6,51.6,61.1,48.8,54.2,76.5,71.1,57.4,49.7,36.9,59.2,84.5,70.0,59.1,68.5,51.8,62.1,64.6,61.6,69.7,66.5,70.1,59.9,71.1,76.4,53.4,56.0,72.7,62.2,75.7,60.7,75.5,61.4,66.0,74.4,61.0,54.1,58.7,66.5,50.2,68.6,57.8,72.3,44.9,57.8,48.8,54.0,64.2,61.1,60.0,59.5,63.7,54.8,66.6,67.1,63.5,66.5,66.1,80.2,59.5,57.7,56.4,54.4,50.5,56.4,62.7,64.1,63.0,56.0,69.6,67.7,59.2,56.8,65.8,66.1,50.6,62.6,65.7,56.0,64.1,49.5,74.5,72.2,60.8,65.6,41.8,52.4,58.3,53.9,68.9,78.6,52.7,55.5,65.6,75.2,52.4,61.5,74.8,50.4,52.7,61.0,59.2,68.8,63.2,49.5,67.7,60.8,73.3,59.2,58.5,68.4,69.3,68.8,51.4,64.9,56.5,66.5,49.7,63.4,58.4,53.7,68.8,63.4,59.9,75.6,59.3,63.5,66.4,59.1,69.4,60.0,61.1,74.7,56.5,44.4,76.0,84.6,60.7,48.9,62.1,63.2,62.8,55.9,66.9,67.1,52.5,71.5,82.8,65.0,62.2,63.5,72.3,50.4,66.2,63.7,80.9,63.9,79.0,57.3,70.6,68.8,58.8,65.7,78.9,63.9,52.5,65.8,59.6,65.8,65.4,50.8,55.5,69.5,63.0,46.4,74.4,69.5,59.7,55.8,71.7,68.6,85.8,68.6,70.0,65.1,74.4,72.5,78.5,62.3,65.7,63.0,74.4,78.5,63.4,62.4,69.7,68.1,75.9,51.7,62.3,60.3,49.1,61.6,62.4,66.9,79.0,67.5,60.1,66.9,76.5,63.8,61.2,73.3,66.7,72.2,71.4,75.4,60.1,71.0,65.7,59.1,55.8,75.5,65.6,59.9,68.4,78.2,50.9,58.6,62.3,81.4,71.4,74.5,61.8,60.8],"Rainfall_mm":[0.0,0.0,4.2,0.0,0.0,7.0,0.0,7.5,0.0,0.0,0.0,0.0,0.0,0.0,1.7,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,3.2,0.0,2.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,7.7,16.1,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,2.3,0.0,0.0,0.0,0.0,7.9,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,5.6,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,10.3,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,19.3,0.0,0.0,6.8,5.8,0.0,0.0,0.0,0.0,8.3,0.0,0.0,0.0,8.2,0.8,0.0,0.0,0.0,3.8,0.0,0.0,0.0,0.0,6.3,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,49.3,28.7,5.3,24.3,12.0,0.0,0.0,4.9,23.1,20.5,4.8,0.0,0.0,0.0,15.6,31.9,14.8,0.0,0.0,17.4,0.0,10.7,0.0,15.5,6.0,0.0,12.1,2.9,1.6,26.4,0.0,0.0,0.0,18.1,15.2,5.5,2.8,13.6,0.0,0.0,0.0,3.7,3.6,6.7,15.2,17.3,11.3,13.1,0.0,1.1,0.0,29.6,10.0,25.6,10.2,18.8,15.0,0.0,4.7,0.0,21.9,10.7,9.6,5.5,0.0,0.0,0.0,6.6,20.9,0.0,13.1,3.8,6.6,0.0,0.0,0.0,0.0,3.3,0.0,15.4,0.0,6.2,0.0,23.4,7.9,2.7,6.0,16.7,0.0,4.1,0.0,2.6,0.0,13.7,0.0,0.0,12.5,0.0,1.6,5.8,0.0,0.0,26.5,34.9,0.0,0.0,0.0,25.7,0.0,9.9,0.0,7.8,0.0,10.6,10.1,0.0,17.7,0.0,0.0,0.0,0.0,0.0,0.0,5.3,5.5,0.0,0.0,0.0,9.1,0.0,0.9,0.0,0.0,0.0,0.0,2.7,0.0,2.7,0.0,0.0,0.0,2.8,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,15.7,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,10.4,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,3.5,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"Wind_Speed_kmph":[8.4,11.5,14.1,8.5,12.8,15.4,14.5,18.2,7.0,10.0,10.0,9.7,7.7,4.8,12.3,7.3,10.3,7.2,6.2,10.8,10.5,12.0,17.7,11.0,11.7,6.2,5.5,15.5,6.8,6.3,9.9,9.7,6.8,8.9,16.3,7.2,7.1,13.3,11.7,7.8,4.5,7.4,9.8,14.1,6.4,9.7,12.4,1.7,13.6,5.9,13.2,12.9,13.8,11.9,1.7,7.3,10.5,9.3,11.7,12.8,14.1,9.3,3.5,8.4,11.5,8.2,12.2,13.2,10.4,1.0,5.5,16.6,8.1,3.1,14.3,10.0,13.9,11.0,11.6,11.3,14.4,18.0,13.4,4.5,11.6,14.0,14.2,8.5,14.1,13.2,19.0,7.4,8.2,8.9,8.3,6.9,1.0,8.5,11.3,8.3,16.8,10.0,14.5,10.9,12.9,11.0,14.8,10.2,11.7,11.3,9.0,13.4,17.8,9.1,11.5,14.4,14.0,10.0,1.7,11.8,2.2,15.1,10.6,13.5,8.8,4.6,10.9,11.9,10.3,10.3,19.7,12.9,13.7,15.0,15.2,9.3,2.8,11.3,14.8,6.6,9.4,7.6,17.3,12.6,12.3,12.2,9.9,12.7,5.9,2.3,10.5,11.1,14.2,15.5,15.5,6.5,10.8,13.7,20.9,17.2,15.9,8.6,6.9,14.8,8.1,11.2,11.6,15.6,8.8,1.5,13.8,9.6,12.1,9.7,9.0,14.8,4.6,10.2,12.4,9.9,6.4,12.3,15.9,11.8,5.1,14.5,4.2,11.1,6.9,7.9,10.5,11.4,9.7,14.1,8.4,13.4,11.0,9.6,9.0,6.2,13.0,10.8,3.7,10.1,6.8,17.5,4.0,7.0,15.9,16.7,9.4,9.8,14.2,1.9,5.5,9.0,17.4,10.5,12.4,16.0,17.4,8.0,9.9,18.4,6.7,13.6,8.4,12.4,11.2,6.6,6.6,11.0,13.5,11.5,10.2,14.0,6.6,14.6,12.9,21.1,10.7,10.4,14.7,14.9,8.1,10.6,11.9,9.1,8.6,12.3,13.5,7.9,5.6,3.3,7.6,7.4,9.5,5.8,9.5,9.3,8.5,14.6,12.3,12.1,8.4,10.5,11.1,14.0,6.8,12.1,4.9,10.7,14.7,9.0,16.4,6.9,10.8,9.9,9.6,11.6,12.4,13.0,14.8,10.0,14.9,7.5,14.7,7.3,13.8,17.7,9.6,4.3,8.1,16.3,11.9,10.9,13.5,13.7,14.3,13.2,15.3,11.3,13.2,8.9,7.9,16.0,10.8,12.8,12.4,7.9,10.0,15.0,11.9,4.0,9.2,16.2,9.3,3.7,16.6,12.4,9.8,8.7,13.8,8.1,14.0,11.9,10.9,10.5,9.4,13.7,7.0,4.3,12.2,12.2,11.7,11.4,8.9,12.8,9.8,8.3,10.9,17.1,3.9,11.7,4.1,9.6,8.5,2.7,11.4,8.7,2.7,12.9,15.0,15.2,11.3,12.2,14.6,15.9,14.0,6.7,10.7,11.5,3.7,11.6,18.0],"Pressure_hPa":[1014.2,1017.2,1010.6,1011.7,1013.3,1007.1,1008.6,1014.4,1016.8,1008.5,1015.4,1011.7,1013.2,1013.6,1013.5,1012.3,1016.9,1013.1,1014.2,1009.1,1019.6,1013.6,1014.5,1006.4,1009.1,1016.3,1013.0,1005.3,1015.6,1010.1,1016.9,1011.7,1012.7,1016.1,1006.9,1008.5,1009.3,1014.9,1007.3,1006.2,1014.9,1009.9,1010.6,1005.5,1009.6,1012.0,1015.3,1009.3,1017.8,1009.6,1007.6,1015.4,1012.7,1010.1,1011.5,1016.7,1017.1,1009.1,1011.9,1012.3,1006.5,1011.8,1012.0,1016.0,1016.2,1008.8,1011.3,1014.3,1010.0,1014.1,1011.7,1008.6,1008.7,1017.1,1011.5,1017.7,1010.2,1013.0,1020.4,1008.3,1003.4,1016.5,1009.1,1011.9,1009.9,1012.9,1008.7,1011.4,1013.6,1008.5,1009.5,1010.8,1007.0,1010.5,1012.4,1010.6,1011.1,1011.9,1009.7,1014.4,1017.0,1010.4,1013.7,1011.2,1013.3,1017.5,1013.8,1005.8,1013.6,1016.3,1011.2,1013.5,1009.6,1006.8,1012.5,1005.9,1011.2,1016.5,1005.3,1007.5,1008.4,1011.8,1010.7,1016.9,1013.3,1013.7,1012.5,1011.4,1007.0,1015.0,1008.1,1014.9,1016.2,1010.7,1011.4,1013.4,1002.0,1011.1,1009.6,1011.8,1014.5,1011.7,1006.0,1011.5,1012.2,1012.4,1012.6,1013.6,1008.2,1012.6,1016.5,1005.9,1012.6,1010.0,1010.7,1008.8,1009.4,1016.4,1005.6,1005.9,1005.4,1018.0,1010.4,1009.9,1008.6,1006.7,1009.2,1020.6,1016.9,1009.0,1012.3,1007.1,1003.8,1015.6,1016.1,1013.7,1010.4,1009.4,1014.6,1011.4,1008.6,1006.3,1010.4,1013.8,1005.8,1012.2,1013.2,1014.6,1015.1,1007.6,1004.3,1008.1,1013.1,1008.1,1009.6,1005.6,1018.1,1012.9,1012.7,1013.4,1012.0,1009.1,1009.4,1008.5,1021.2,1011.9,1010.4,1011.6,1006.5,1015.3,1007.7,1011.8,1013.7,1013.3,1010.3,1012.0,1009.8,1008.0,1008.4,1015.2,1011.6,1009.2,1010.2,1013.9,1012.4,1014.0,1009.1,1012.0,1007.7,1011.1,1015.4,1015.1,1008.6,1007.0,1012.4,1016.0,1005.3,1011.0,1007.2,1007.8,1008.7,1008.5,1008.1,1010.0,1010.1,1004.9,1014.7,1012.6,1015.0,1004.6,1013.0,1014.4,1006.4,1012.0,1009.6,1016.4,1018.7,1006.2,1018.7,1006.8,1015.4,1015.4,1008.5,1011.7,1011.6,1011.9,1012.8,1014.2,1012.3,1009.4,1013.8,1014.0,1012.6,1009.7,1008.3,1010.0,1009.8,1014.8,1015.4,1009.5,1015.0,1016.8,1012.9,1009.1,1015.5,1011.8,1010.4,1010.8,1008.9,1006.9,1014.2,1007.3,1022.7,1006.2,1007.6,1013.8,1017.4,1010.2,1014.0,1005.5,1009.6,1008.2,1005.4,1012.4,1004.2,1007.4,1010.1,1009.1,1011.4,1013.1,1015.1,1014.6,1016.0,1012.0,1013.1,1013.8,1012.5,1010.6,1010.8,1009.1,1013.5,1011.7,1009.7,1009.7,1007.8,1015.4,1012.3,1009.0,1014.8,1010.0,1007.1,1015.6,1010.1,1010.6,1012.1,1016.0,1012.1,1007.8,1013.9,1010.3,1016.6,1012.0,1004.2,1013.3,1018.8,1017.5,1018.4,1008.4,1015.2,1009.5,1012.8,1007.5,1009.7,1009.6,1015.1,1012.8,1013.0,1007.3,1010.9,1009.4,1015.0,1016.1,1015.7,1009.4,1002.4],"Cloud_Cover_Percent":[53.5,81.3,72.6,58.6,93.0,98.6,74.5,83.5,70.2,73.7,98.0,70.8,65.6,88.9,65.6,77.7,70.4,29.6,34.7,46.9,69.8,71.6,71.4,92.4,45.1,55.3,70.9,55.8,69.8,51.5,83.3,63.4,93.3,70.3,90.5,64.8,83.0,65.2,67.3,73.3,55.8,64.7,64.7,84.2,59.2,77.8,51.9,66.5,54.6,60.1,85.4,100.0,77.7,83.5,82.0,87.4,62.0,91.3,54.0,52.2,66.7,99.2,85.4,55.0,83.1,83.8,92.9,47.7,53.1,65.9,40.6,77.3,58.3,71.4,96.7,60.5,63.2,69.4,84.4,57.8,65.5,84.8,69.1,47.5,54.2,82.9,72.9,66.8,74.2,65.9,74.8,55.0,51.5,70.7,65.5,75.1,47.4,62.2,67.4,66.1,64.9,61.5,65.5,69.5,76.0,65.6,53.0,57.9,67.7,65.0,68.6,91.4,70.0,83.0,90.1,55.0,61.0,64.1,60.9,50.7,59.0,54.5,58.3,55.0,96.2,72.0,94.6,80.6,78.5,63.2,72.3,60.8,86.6,58.6,67.5,74.2,49.3,83.6,84.5,35.7,60.4,56.3,67.4,73.0,60.9,42.4,65.1,72.7,56.4,76.2,51.3,56.7,62.8,79.9,86.5,48.7,84.6,74.8,99.3,72.6,92.4,63.2,86.1,87.0,73.2,70.4,81.6,72.8,64.4,55.2,90.7,76.1,68.5,41.4,62.4,83.3,76.5,88.1,65.2,85.0,67.7,61.6,62.7,65.3,84.6,80.5,73.5,71.5,77.0,82.4,74.0,78.6,63.6,74.2,66.7,54.7,64.3,70.5,67.1,68.7,96.2,88.2,80.4,100.0,62.7,100.0,60.0,82.8,68.7,83.1,79.2,84.1,100.0,64.4,82.9,38.2,76.1,73.3,64.8,72.5,100.0,53.1,40.6,71.3,85.3,62.6,83.6,93.8,62.0,60.3,51.2,53.1,55.7,63.8,66.9,89.3,73.3,85.1,69.8,53.9,91.8,84.2,89.3,75.0,52.4,55.8,56.7,76.1,71.5,58.5,45.1,58.1,73.9,44.6,69.1,65.7,64.3,51.0,74.0,94.8,45.4,59.2,82.9,68.7,44.0,100.0,73.3,89.7,58.9,73.2,83.8,66.6,85.6,58.9,66.1,55.4,76.9,63.5,76.5,83.0,62.5,83.5,81.6,77.0,95.5,75.6,58.6,51.2,62.3,60.8,55.7,74.5,72.1,70.8,58.1,74.2,51.9,86.2,59.0,71.1,68.2,67.0,78.1,49.1,65.5,60.1,70.3,63.9,79.1,72.7,56.4,61.6,77.0,69.7,78.1,69.8,52.3,84.6,58.1,68.8,55.2,90.1,62.5,59.2,63.9,54.2,70.2,90.7,49.7,67.3,28.2,53.4,58.3,52.8,78.5,69.4,63.8,56.5,42.5,58.1,90.0,36.5,60.5,60.6,89.9,77.7,64.3,76.7,59.3,76.8,44.1,71.1,66.2,52.3,58.3,84.8,66.9,61.7,53.1,70.0,80.2,67.7,65.1,64.0,68.2],"Sunshine_Hours":[8.2,4.3,5.2,8.7,2.7,2.1,4.8,2.1,4.0,3.6,2.3,4.2,5.1,3.7,5.8,3.6,3.8,9.7,8.8,5.2,4.2,4.5,5.1,3.2,7.3,6.6,4.5,5.2,4.3,6.4,3.1,3.3,1.8,4.5,2.2,4.8,3.7,3.9,3.1,3.8,6.7,6.7,5.8,1.6,5.3,4.0,6.5,5.4,5.1,5.6,3.4,2.3,2.9,2.8,0.6,2.1,4.8,1.4,6.3,6.2,2.6,1.8,2.0,6.5,1.9,3.1,1.9,7.0,6.3,4.7,5.9,2.3,5.1,4.3,1.2,6.1,4.9,3.6,2.8,5.9,5.3,4.9,3.9,6.7,6.5,3.2,3.7,3.3,3.6,3.8,2.3,5.2,5.3,5.0,5.5,3.1,6.5,3.4,4.3,5.3,5.8,4.6,6.0,3.0,2.7,5.6,7.9,6.2,4.7,2.8,2.6,2.5,4.1,2.1,2.6,6.1,6.3,5.2,6.6,6.4,5.5,7.1,4.7,8.8,2.3,4.7,2.6,5.3,4.4,3.6,5.7,5.1,2.9,4.4,5.3,3.4,6.7,2.9,5.0,9.9,5.5,5.9,4.4,5.3,5.1,6.8,6.0,3.7,5.8,2.3,7.1,7.8,5.9,5.0,2.0,6.9,2.1,3.8,2.3,4.3,0.8,3.9,1.5,3.3,6.2,5.8,1.4,5.6,6.0,4.4,2.1,5.0,5.2,6.0,5.9,1.0,3.6,3.8,5.0,2.5,5.6,6.3,6.5,5.8,4.1,4.2,4.4,4.4,3.6,2.1,3.1,3.4,5.4,5.5,4.8,7.0,6.2,4.2,5.4,4.4,3.2,3.3,2.3,1.7,6.9,1.3,5.9,3.8,3.6,3.7,2.2,2.5,2.6,5.4,2.9,8.1,3.8,4.2,5.7,3.5,1.5,5.9,5.9,3.5,4.5,5.6,1.8,0.6,5.2,7.0,6.2,7.5,6.3,5.6,3.5,3.5,3.8,3.9,3.7,6.3,2.7,2.9,3.0,3.7,5.6,7.5,6.9,3.1,4.9,4.9,5.8,6.7,2.4,8.0,4.3,4.7,5.5,7.0,3.3,2.7,7.1,4.3,3.0,6.0,8.8,2.2,3.0,3.0,6.5,4.9,3.9,5.2,2.9,5.0,3.0,6.3,4.0,5.7,2.5,3.8,7.3,3.2,3.3,4.1,4.0,2.9,5.8,5.6,4.7,5.4,7.3,5.9,4.7,4.0,8.2,3.6,5.7,1.1,7.0,5.4,7.1,3.4,5.2,6.7,5.8,3.8,5.9,5.9,3.5,4.9,5.1,4.8,3.3,2.7,4.6,5.7,5.6,3.4,5.4,4.9,5.4,1.6,6.3,5.5,7.1,6.1,3.6,3.7,7.2,5.5,9.9,5.5,5.5,6.1,2.4,4.3,6.5,6.1,5.9,4.1,4.2,7.8,4.8,5.2,1.0,5.2,4.7,5.2,5.6,5.2,7.3,5.2,5.6,6.9,6.0,2.8,6.7,4.4,6.2,4.5,3.9,4.3,5.3,4.9,3.1],"Temperature_Change":[null,-3.0,3.9,0.4,-6.4,1.4,3.1,-1.0,0.6,-1.9,3.8,-0.2,-1.6,2.3,-1.5,-2.9,2.7,-2.9,4.0,-2.0,-0.3,-1.1,4.2,-3.0,-0.6,0.2,2.0,-0.3,0.1,0.1,3.8,-5.6,-0.2,-0.6,3.2,1.2,-2.7,-1.6,0.1,3.3,0.2,-0.4,-2.6,2.0,-0.2,0.3,1.5,-1.4,1.1,-1.3,0.6,0.8,-4.5,2.6,-0.3,-0.3,0.9,4.0,-5.1,4.1,-5.8,3.0,1.2,1.0,0.4,0.3,-2.4,-0.2,3.0,-2.2,-2.3,0.4,0.6,3.2,-0.7,1.3,-2.4,1.4,1.1,-2.0,1.8,-2.4,0.8,0.1,-1.7,3.8,-2.0,1.2,1.1,0.0,0.6,-1.6,-0.6,0.9,-3.4,0.6,0.4,0.8,3.2,-2.8,1.3,3.8,-3.5,2.5,-3.6,1.7,-1.5,1.5,2.7,-5.5,4.9,-0.3,-1.7,-1.8,3.5,-1.2,1.8,-0.3,3.6,-3.9,-1.6,2.8,0.2,2.6,-1.0,-0.9,2.5,-5.7,1.3,-0.5,1.3,-2.1,4.5,-1.8,-2.6,1.1,3.0,1.3,2.7,2.1,-5.4,-3.0,-2.4,5.4,-2.3,1.0,-0.3,1.1,2.7,-1.9,-0.6,-1.8,-1.3,2.7,1.0,4.1,-3.5,2.0,-3.2,-1.4,0.6,0.6,6.4,-6.4,3.7,-3.8,4.1,-1.1,-1.1,0.3,-1.3,2.5,-1.9,-1.6,-0.1,3.2,3.1,-3.1,-0.6,0.9,2.3,-2.4,-1.3,3.4,-1.5,2.5,-2.9,-3.1,-0.3,6.7,0.2,-4.2,-0.4,4.1,-5.6,0.5,3.4,-2.3,0.9,-0.3,1.1,2.4,-2.9,1.2,-5.9,4.4,-1.8,-0.8,0.7,1.2,2.7,-5.0,3.0,-1.2,0.3,2.9,-1.1,1.7,-3.3,-1.2,1.0,1.0,-0.2,-2.8,2.5,0.3,5.0,-1.5,-6.1,1.2,-2.6,1.9,1.9,1.9,-4.3,0.1,-3.4,4.3,-2.1,1.1,-0.8,1.6,-3.7,0.6,7.8,-7.6,0.3,6.4,2.3,-9.1,1.7,1.5,3.0,-6.1,1.5,2.2,-0.9,-1.9,0.4,-2.8,2.4,-0.2,1.0,-1.8,2.2,1.1,-2.0,0.3,-0.8,-0.2,-1.7,2.2,-1.0,4.7,-1.3,-2.7,-2.6,-0.9,5.0,-2.2,0.4,-5.0,5.8,-1.2,-3.6,1.3,1.5,-0.6,-0.9,0.3,-0.4,0.8,2.8,-9.0,5.0,0.8,0.1,-1.6,-3.2,4.5,3.0,-7.3,5.2,-2.7,0.5,-2.3,1.5,3.5,-1.7,2.4,-1.3,-1.7,2.8,-3.0,0.7,-2.6,0.7,-1.8,3.6,-4.9,4.2,-2.2,2.9,-1.0,2.3,-2.5,-5.2,3.2,-2.5,1.3,4.4,-2.0,-3.0,-0.8,2.2,-2.8,1.1,2.1,1.8,-1.3,-6.5,5.6,-0.6,0.7,2.6,-8.2,3.2,2.5,-4.8,6.7,-2.5,1.0,-3.2,3.0,0.5,-1.9,-0.1,0.0,-2.5,1.5,-0.1,1.1,1.3,-4.6,2.0],"Season":["Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Summer","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Post-Monsoon","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter","Winter"],"Day_Type":["Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday","Weekday","Weekday","Weekend","Weekend","Weekday","Weekday","Weekday"],"Year":[2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0,2025.0]};
+const N=D.Date.length;
+const NUM=['Temperature','Feels_Like_Temperature','Humidity','Rainfall_mm','Wind_Speed_kmph','Pressure_hPa','Cloud_Cover_Percent','Sunshine_Hours','Temperature_Change'];
+const LBL={Temperature:'Temperature (°C)',Feels_Like_Temperature:'Feels-like (°C)',Humidity:'Humidity (%)',Rainfall_mm:'Rainfall (mm)',Wind_Speed_kmph:'Wind speed (km/h)',Pressure_hPa:'Pressure (hPa)',Cloud_Cover_Percent:'Cloud cover (%)',Sunshine_Hours:'Sunshine (hours)',Temperature_Change:'Day-to-day change (°C)'};
+const SHORT={Temperature:'Temp',Feels_Like_Temperature:'Feels',Humidity:'Humid.',Rainfall_mm:'Rain',Wind_Speed_kmph:'Wind',Pressure_hPa:'Press.',Cloud_Cover_Percent:'Cloud',Sunshine_Hours:'Sun',Temperature_Change:'ΔTemp'};
+const SEASONS=['Winter','Summer','Monsoon','Post-Monsoon'];
+const SCOL={Winter:'--c-winter',Summer:'--c-summer',Monsoon:'--c-monsoon','Post-Monsoon':'--c-post'};
+const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MONTH=D.Date.map(s=>+s.slice(5,7)-1);
+
+/* ---------- math ---------- */
+const sum=a=>{let s=0;for(const v of a)s+=v;return s};
+const clean=a=>a.filter(v=>v!=null&&!isNaN(v));
+const mean=a=>sum(a)/a.length;
+const variance=a=>{const m=mean(a);let s=0;for(const v of a)s+=(v-m)*(v-m);return s/(a.length-1)};
+const sd=a=>Math.sqrt(variance(a));
+const quant=(a,p)=>{const s=[...a].sort((x,y)=>x-y);const h=(s.length-1)*p,l=Math.floor(h);return s[l]+(h-l)*((s[l+1]!==undefined?s[l+1]:s[l])-s[l])};
+const skew=a=>{const m=mean(a),n=a.length;let s2=0,s3=0;for(const v of a){s2+=(v-m)**2;s3+=(v-m)**3}return (s3/n)/Math.pow(s2/n,1.5)};
+const kurtEx=a=>{const m=mean(a),n=a.length;let s2=0,s4=0;for(const v of a){s2+=(v-m)**2;s4+=(v-m)**4}return (s4/n)/((s2/n)**2)-3};
+function pairs(x,y){const a=[],b=[];for(let i=0;i<x.length;i++){if(x[i]!=null&&y[i]!=null){a.push(x[i]);b.push(y[i])}}return [a,b]}
+function corr(x,y){const [a,b]=pairs(x,y);const ma=mean(a),mb=mean(b);let sxy=0,sxx=0,syy=0;for(let i=0;i<a.length;i++){sxy+=(a[i]-ma)*(b[i]-mb);sxx+=(a[i]-ma)**2;syy+=(b[i]-mb)**2}return {r:sxy/Math.sqrt(sxx*syy),n:a.length,slope:sxy/sxx,icpt:mb-sxy/sxx*ma,a,b}}
+function lgamma(z){const c=[76.18009172947146,-86.50532032941677,24.01409824083091,-1.231739572450155,0.1208650973866179e-2,-0.5395239384953e-5];let x=z,y=z,t=x+5.5;t-=(x+0.5)*Math.log(t);let s=1.000000000190015;for(let j=0;j<6;j++){y+=1;s+=c[j]/y}return -t+Math.log(2.5066282746310005*s/x)}
+function betacf(a,b,x){const FP=1e-300;const qab=a+b,qap=a+1,qam=a-1;let c=1,d=1-qab*x/qap;if(Math.abs(d)<FP)d=FP;d=1/d;let h=d;for(let m=1;m<=300;m++){const m2=2*m;let aa=m*(b-m)*x/((qam+m2)*(a+m2));d=1+aa*d;if(Math.abs(d)<FP)d=FP;c=1+aa/c;if(Math.abs(c)<FP)c=FP;d=1/d;h*=d*c;aa=-(a+m)*(qab+m)*x/((a+m2)*(qap+m2));d=1+aa*d;if(Math.abs(d)<FP)d=FP;c=1+aa/c;if(Math.abs(c)<FP)c=FP;d=1/d;const del=d*c;h*=del;if(Math.abs(del-1)<3e-12)break}return h}
+function betai(a,b,x){if(x<=0)return 0;if(x>=1)return 1;const bt=Math.exp(lgamma(a+b)-lgamma(a)-lgamma(b)+a*Math.log(x)+b*Math.log(1-x));return x<(a+1)/(a+b+2)?bt*betacf(a,b,x)/a:1-bt*betacf(b,a,1-x)/b}
+const tcdf=(t,df)=>{const p=0.5*betai(df/2,0.5,df/(df+t*t));return t>0?1-p:p};
+const tpTwo=(t,df)=>betai(df/2,0.5,df/(df+t*t));
+const tcache={};
+function tinv(p,df){const k=p+'|'+df;if(tcache[k]!==undefined)return tcache[k];let lo=-60,hi=60;for(let i=0;i<70;i++){const m=(lo+hi)/2;if(tcdf(m,df)<p)lo=m;else hi=m}return tcache[k]=(lo+hi)/2}
+const fP=(F,d1,d2)=>betai(d2/2,d1/2,d2/(d2+d1*F));
+const zinv=p=>tinv(p,100000);
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function inv(A){const n=A.length;const M=A.map((r,i)=>[...r,...Array.from({length:n},(_,j)=>i===j?1:0)]);for(let i=0;i<n;i++){let p=i;for(let r=i+1;r<n;r++)if(Math.abs(M[r][i])>Math.abs(M[p][i]))p=r;[M[i],M[p]]=[M[p],M[i]];const d=M[i][i];for(let j=0;j<2*n;j++)M[i][j]/=d;for(let r=0;r<n;r++){if(r!==i){const f=M[r][i];if(f)for(let j=0;j<2*n;j++)M[r][j]-=f*M[i][j]}}}return M.map(r=>r.slice(n))}
+function ols(X,y){const n=X.length,k=X[0].length;const XtX=Array.from({length:k},()=>Array(k).fill(0));const Xty=Array(k).fill(0);for(let i=0;i<n;i++){for(let a=0;a<k;a++){Xty[a]+=X[i][a]*y[i];for(let b=0;b<k;b++)XtX[a][b]+=X[i][a]*X[i][b]}}const iv=inv(XtX);const beta=iv.map(r=>{let s=0;for(let j=0;j<k;j++)s+=r[j]*Xty[j];return s});let sse=0;for(let i=0;i<n;i++){let p=0;for(let j=0;j<k;j++)p+=beta[j]*X[i][j];sse+=(y[i]-p)**2}const df=n-k,s2=sse/df;return {beta,iv,sse,df,s2,se:iv.map((r,i)=>Math.sqrt(s2*r[i])),n,k}}
+
+/* ---------- formatting & dom ---------- */
+const $=id=>document.getElementById(id);
+const val=id=>$(id).value;
+const f1=v=>v.toFixed(1),f2=v=>v.toFixed(2),f3=v=>v.toFixed(3);
+const pf=p=>p<0.001?'< 0.001':p.toFixed(3);
+const sgn=v=>(v>=0?'+':'')+v.toFixed(2);
+const dlab=s=>MON[+s.slice(5,7)-1]+' '+(+s.slice(8));
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function fill(id,items,sel){$(id).innerHTML=items.map(v=>`<option value="${v}"${v===sel?' selected':''}>${LBL[v]||v}</option>`).join('')}
+const monthly=col=>{const o=Array.from({length:12},()=>({v:[]}));for(let i=0;i<N;i++){if(D[col][i]!=null)o[MONTH[i]].v.push(D[col][i])}return o.map(m=>({n:m.v.length,mean:m.v.length?mean(m.v):null,min:Math.min(...m.v),max:Math.max(...m.v),sum:sum(m.v)}))};
+const ma=(a,w)=>a.map((_,i)=>{if(i<w-1)return null;let s=0,c=0;for(let j=i-w+1;j<=i;j++){if(a[j]!=null){s+=a[j];c++}}return c?s/c:null});
+
+/* ---------- charts ---------- */
+const charts={};
+function merge(a,b){for(const k in b){if(b[k]&&typeof b[k]==='object'&&!Array.isArray(b[k])){a[k]=merge(a[k]&&typeof a[k]==='object'?a[k]:{},b[k])}else a[k]=b[k]}return a}
+function opts(extra){
+  const ink=css('--ink'),mu=css('--muted'),gr=css('--line');
+  const base={responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},
+    plugins:{legend:{labels:{color:ink,usePointStyle:true,boxWidth:8,font:{size:12}}},
+      tooltip:{backgroundColor:css('--surface'),titleColor:ink,bodyColor:ink,borderColor:gr,borderWidth:1,padding:10}},
+    scales:{x:{ticks:{color:mu},grid:{color:gr},border:{color:gr},title:{color:mu}},y:{ticks:{color:mu},grid:{color:gr},border:{color:gr},title:{color:mu}}}};
+  return merge(base,extra||{});
+}
+function mk(id,cfg,extra){if(charts[id])charts[id].destroy();cfg.options=opts(extra);charts[id]=new Chart($(id),cfg);return charts[id]}
+function dateTicks(){return {maxTicksLimit:12,maxRotation:0,autoSkip:true,callback:function(v){return dlab(this.getLabelForValue(v))}}}
+function axisT(t){return {display:true,text:t}}
+const alpha=(c,a)=>{const m=/^#([0-9a-f]{6})$/i.exec(c);if(!m)return c;const n=parseInt(m[1],16);return `rgba(${n>>16},${(n>>8)&255},${n&255},${a})`};
+
+/* ---------- OVERVIEW ---------- */
+function renderOverview(){
+  const T=D.Temperature,R=D.Rainfall_mm;
+  const mx=Math.max(...T),mn=Math.min(...T),imx=T.indexOf(mx),imn=T.indexOf(mn);
+  const rainy=R.filter(v=>v>0).length;
+  const tile=(k,v,u,s,c)=>`<div class="tile ${c||''}"><span class="k">${k}</span><span class="v">${v}<small>${u}</small></span><span class="s">${s}</span></div>`;
+  $('ovTiles').innerHTML=
+    tile('Mean temperature',f1(mean(T)),'°C','SD '+f1(sd(T))+' °C','hot')+
+    tile('Hottest day',f1(mx),'°C',dlab(D.Date[imx]))+
+    tile('Coldest day',f1(mn),'°C',dlab(D.Date[imn]))+
+    tile('Total rainfall',Math.round(sum(R)),'mm',rainy+' rainy days of '+N)+
+    tile('Mean humidity',f1(mean(D.Humidity)),'%','Range '+f1(Math.min(...D.Humidity))+'–'+f1(Math.max(...D.Humidity)))+
+    tile('Mean sunshine',f1(mean(D.Sunshine_Hours)),'h','per day');
+  mk('chOvDaily',{type:'line',data:{labels:D.Date,datasets:[
+    {label:'Temperature',data:T,borderColor:alpha(css('--accent'),.55),backgroundColor:alpha(css('--accent'),.12),borderWidth:1.2,pointRadius:0,fill:true,tension:.2},
+    {label:'7-day average',data:ma(T,7),borderColor:css('--ink'),borderWidth:2.4,pointRadius:0,tension:.3},
+    {label:'Feels-like',data:D.Feels_Like_Temperature,borderColor:css('--cool'),borderWidth:1.2,borderDash:[4,3],pointRadius:0,hidden:true}
+  ]}},{scales:{x:{ticks:dateTicks()},y:{title:axisT('°C')}}});
+  const mm=monthly('Temperature');
+  mk('chOvMonthly',{type:'bar',data:{labels:MON,datasets:[
+    {type:'bar',label:'Min to max',data:mm.map(m=>[m.min,m.max]),backgroundColor:alpha(css('--cool'),.35),borderColor:css('--cool'),borderWidth:1,borderRadius:3,borderSkipped:false,barPercentage:.7},
+    {type:'line',label:'Monthly mean',data:mm.map(m=>m.mean),borderColor:css('--accent'),backgroundColor:css('--accent'),borderWidth:2.5,pointRadius:4,tension:.25}
+  ]}},{scales:{y:{title:axisT('°C')}}});
+  const cs=NUM.filter(c=>c!=='Temperature'&&c!=='Feels_Like_Temperature'&&c!=='Temperature_Change').map(c=>({c,r:corr(D.Temperature,D[c]).r})).sort((a,b)=>Math.abs(b.r)-Math.abs(a.r));
+  const sm=SEASONS.map(s=>({s,m:mean(D.Temperature.filter((_,i)=>D.Season[i]===s))})).sort((a,b)=>b.m-a.m);
+  const wm=Math.max(...R),iwm=R.indexOf(wm);
+  const jun=monthly('Rainfall_mm');const wetM=jun.reduce((b,m,i)=>m.sum>jun[b].sum?i:b,0);
+  $('ovInsights').innerHTML=[
+    `Temperature peaked in ${MON[mm.reduce((b,m,i)=>m.mean>mm[b].mean?i:b,0)]} with a monthly mean of ${f1(Math.max(...mm.map(m=>m.mean)))} °C and bottomed out in ${MON[mm.reduce((b,m,i)=>m.mean<mm[b].mean?i:b,0)]} at ${f1(Math.min(...mm.map(m=>m.mean)))} °C.`,
+    `${sm[0].s} was the warmest season (${f1(sm[0].m)} °C average) and ${sm[3].s} the coolest (${f1(sm[3].m)} °C).`,
+    `${MON[wetM]} was the wettest month with ${Math.round(jun[wetM].sum)} mm. The single wettest day was ${dlab(D.Date[iwm])} at ${f1(wm)} mm.`,
+    `Of the other weather measurements, ${LBL[cs[0].c].replace(/ \(.*\)/,'').toLowerCase()} tracks temperature most closely (r = ${f2(cs[0].r)}).`,
+    `Day-to-day temperature swings average ${f1(mean(D.Temperature_Change.filter(v=>v!=null).map(Math.abs)))} °C in size and reach ${f1(Math.max(...D.Temperature_Change.filter(v=>v!=null).map(Math.abs)))} °C at most.`
+  ].map(t=>`<li>${t}</li>`).join('');
+}
+
+/* ---------- TRENDS ---------- */
+function renderTrends(){
+  const c=val('trVar'),w=+val('trWin');
+  const ds=[{label:LBL[c],data:D[c],borderColor:w>1?alpha(css('--accent'),.5):css('--accent'),borderWidth:w>1?1.1:1.8,pointRadius:0,tension:.15}];
+  if(w>1)ds.push({label:w+'-day average',data:ma(D[c],w),borderColor:css('--ink'),borderWidth:2.5,pointRadius:0,tension:.3});
+  mk('chTrend',{type:'line',data:{labels:D.Date,datasets:ds}},{scales:{x:{ticks:dateTicks()},y:{title:axisT(LBL[c])}}});
+  const rm=monthly('Rainfall_mm');
+  mk('chRain',{type:'bar',data:{labels:MON,datasets:[{label:'Rainfall (mm)',data:rm.map(m=>+m.sum.toFixed(1)),backgroundColor:css('--c-monsoon'),borderRadius:3}]}},{plugins:{legend:{display:false}},scales:{y:{title:axisT('mm')}}});
+  const rd=Array(12).fill(0);for(let i=0;i<N;i++)if(D.Rainfall_mm[i]>0)rd[MONTH[i]]++;
+  mk('chRainDays',{type:'bar',data:{labels:MON,datasets:[{label:'Rainy days',data:rd,backgroundColor:css('--cool'),borderRadius:3}]}},{plugins:{legend:{display:false}},scales:{y:{title:axisT('days')}}});
+  const cols=NUM.filter(x=>x!=='Temperature_Change');
+  const mo=cols.map(monthly);
+  $('trTable').innerHTML='<tr><th>Month</th>'+cols.map(x=>`<th>${SHORT[x]}</th>`).join('')+'</tr>'+MON.map((m,i)=>`<tr><td>${m}</td>${cols.map((x,j)=>`<td>${f1(mo[j][i].mean)}</td>`).join('')}</tr>`).join('');
+}
+
+/* ---------- SEASONS ---------- */
+function grp(col,key,v){const a=[];for(let i=0;i<N;i++)if(D[col][i]!=null&&D[key][i]===v)a.push(D[col][i]);return a}
+function renderSeasons(){
+  const c=val('seVar');
+  const rows=SEASONS.map(s=>{const a=grp(c,'Season',s),m=mean(a),se=sd(a)/Math.sqrt(a.length),t=tinv(.975,a.length-1);return {s,n:a.length,m,sd:sd(a),mn:Math.min(...a),mx:Math.max(...a),e:t*se}});
+  if(charts.chSeason)charts.chSeason.destroy();
+  charts.chSeason=new Chart($('chSeason'),{type:'line',data:{labels:SEASONS,datasets:[{label:'Mean ± 95% CI',data:rows.map(r=>r.m),errors:rows.map(r=>r.e),showLine:false,pointRadius:8,pointBackgroundColor:SEASONS.map(s=>css(SCOL[s])),pointBorderColor:css('--surface'),pointBorderWidth:2}]},options:opts({plugins:{legend:{display:false}},scales:{y:{title:axisT(LBL[c])}}}),plugins:[{id:'err',afterDatasetsDraw(ch){const d=ch.data.datasets[0],meta=ch.getDatasetMeta(0),{ctx,scales}=ch;ctx.save();ctx.strokeStyle=css('--ink');ctx.lineWidth=1.6;meta.data.forEach((p,i)=>{const y1=scales.y.getPixelForValue(d.data[i]+d.errors[i]),y2=scales.y.getPixelForValue(d.data[i]-d.errors[i]);ctx.beginPath();ctx.moveTo(p.x,y1);ctx.lineTo(p.x,y2);ctx.moveTo(p.x-7,y1);ctx.lineTo(p.x+7,y1);ctx.moveTo(p.x-7,y2);ctx.lineTo(p.x+7,y2);ctx.stroke()});ctx.restore()}}]});
+  $('seTable').innerHTML='<tr><th>Season</th><th>Days</th><th>Mean</th><th>SD</th><th>Min</th><th>Max</th><th>95% CI</th></tr>'+rows.map(r=>`<tr><td><span class="sw" style="background:var(${SCOL[r.s]})"></span>${r.s}</td><td>${r.n}</td><td>${f2(r.m)}</td><td>${f2(r.sd)}</td><td>${f1(r.mn)}</td><td>${f1(r.mx)}</td><td>${f2(r.m-r.e)} – ${f2(r.m+r.e)}</td></tr>`).join('');
+  const dr=['Weekday','Weekend'].map(s=>{const a=grp(c,'Day_Type',s),m=mean(a),e=tinv(.975,a.length-1)*sd(a)/Math.sqrt(a.length);return `<tr><td>${s}</td><td>${a.length}</td><td>${f2(m)}</td><td>${f2(sd(a))}</td><td>${f2(m-e)} – ${f2(m+e)}</td></tr>`}).join('');
+  $('dtTable').innerHTML='<tr><th>Day type</th><th>Days</th><th>Mean</th><th>SD</th><th>95% CI</th></tr>'+dr;
+  const cols=NUM.filter(x=>x!=='Temperature_Change');
+  $('seProfile').innerHTML='<tr><th>Season</th><th>Days</th>'+cols.map(x=>`<th>${SHORT[x]}</th>`).join('')+'</tr>'+SEASONS.map(s=>`<tr><td><span class="sw" style="background:var(${SCOL[s]})"></span>${s}</td><td>${D.Season.filter(v=>v===s).length}</td>${cols.map(x=>`<td>${f1(mean(grp(x,'Season',s)))}</td>`).join('')}</tr>`).join('');
+  const jit=mulberry32(7);
+  mk('chSeasonBox',{type:'scatter',data:{datasets:SEASONS.map((s,k)=>({label:s,data:grp('Temperature','Season',s).map(v=>({x:k+(jit()-.5)*.55,y:v})),backgroundColor:alpha(css(SCOL[s]),.7),pointRadius:3.2}))}},
+    {interaction:{mode:'nearest',intersect:true},scales:{x:{min:-.6,max:3.6,ticks:{stepSize:1,callback:v=>SEASONS[v]||''},grid:{display:false}},y:{title:axisT('Temperature (°C)')}},plugins:{tooltip:{callbacks:{title:()=>'',label:c=>c.dataset.label+': '+f1(c.parsed.y)+' °C'}}}});
+}
+
+/* ---------- RELATIONSHIPS ---------- */
+function renderRel(){
+  const M=NUM.map(a=>NUM.map(b=>a===b?1:corr(D[a],D[b]).r));
+  const pos=css('--accent'),neg=css('--cool');
+  $('heat').innerHTML='<tr><th></th>'+NUM.map(x=>`<th style="text-align:center">${SHORT[x]}</th>`).join('')+'</tr>'+NUM.map((a,i)=>`<tr><td><b>${SHORT[a]}</b></td>${M[i].map(r=>`<td style="background:color-mix(in srgb, ${r>=0?'var(--accent)':'var(--cool)'} ${Math.round(Math.min(1,Math.abs(r))*70)}%, var(--surface))">${f2(r)}</td>`).join('')}</tr>`).join('');
+  const L=[];for(let i=0;i<NUM.length;i++)for(let j=i+1;j<NUM.length;j++)L.push({a:NUM[i],b:NUM[j],r:M[i][j]});
+  L.sort((x,y)=>Math.abs(y.r)-Math.abs(x.r));
+  const strength=r=>{r=Math.abs(r);return r>=.8?'very strong':r>=.6?'strong':r>=.4?'moderate':r>=.2?'weak':'negligible'};
+  $('topCorr').innerHTML=L.slice(0,6).map(p=>`<li><b>${SHORT[p.a]} and ${SHORT[p.b]}</b>: r = ${sgn(p.r)}, a ${strength(p.r)} ${p.r>=0?'positive':'negative'} relationship.</li>`).join('');
+  renderScatter();
+}
+function renderScatter(){
+  const x=val('scX'),y=val('scY');
+  const cr=corr(D[x],D[y]);
+  $('scLegend').innerHTML=SEASONS.map(s=>`<span><span class="sw" style="background:var(${SCOL[s]})"></span>${s}</span>`).join('');
+  const ds=SEASONS.map(s=>{const pts=[];for(let i=0;i<N;i++)if(D.Season[i]===s&&D[x][i]!=null&&D[y][i]!=null)pts.push({x:D[x][i],y:D[y][i]});return {type:'scatter',label:s,data:pts,backgroundColor:alpha(css(SCOL[s]),.7),pointRadius:3.4}});
+  const xs=cr.a,x0=Math.min(...xs),x1=Math.max(...xs);
+  ds.push({type:'line',label:'Fitted line',data:[{x:x0,y:cr.icpt+cr.slope*x0},{x:x1,y:cr.icpt+cr.slope*x1}],borderColor:css('--ink'),borderWidth:2.4,pointRadius:0});
+  mk('chScatter',{type:'scatter',data:{datasets:ds}},{interaction:{mode:'nearest',intersect:true},plugins:{legend:{display:false},tooltip:{callbacks:{title:()=>'',label:c=>c.dataset.label==='Fitted line'?'Fitted line':c.dataset.label+': ('+c.parsed.x+', '+c.parsed.y+')'}}},scales:{x:{type:'linear',title:axisT(LBL[x])},y:{title:axisT(LBL[y])}}});
+  const tt=cr.r*Math.sqrt((cr.n-2)/(1-cr.r*cr.r)),p=x===y?0:tpTwo(tt,cr.n-2);
+  $('scStats').innerHTML=x===y?'Pick two different variables.':`<b>r = ${f3(cr.r)}</b> · R² = ${f3(cr.r*cr.r)} · slope = ${cr.slope.toFixed(3)} · n = ${cr.n} · p ${p<0.001?'< 0.001':'= '+f3(p)}<br>A one-unit rise in ${SHORT[x]} goes with a ${cr.slope>=0?'rise':'fall'} of ${Math.abs(cr.slope).toFixed(3)} in ${SHORT[y]} on average. This shows association, not cause.`;
+}
+
+/* ---------- STATISTICS ---------- */
+function renderStats(){
+  $('descTable').innerHTML='<tr><th>Variable</th><th>n</th><th>Mean</th><th>Median</th><th>SD</th><th>Min</th><th>Q1</th><th>Q3</th><th>Max</th><th>Skew</th><th>Ex. kurt.</th><th>CV %</th></tr>'+
+    NUM.map(c=>{const a=clean(D[c]),m=mean(a),s=sd(a);return `<tr><td>${LBL[c]}</td><td>${a.length}</td><td>${f2(m)}</td><td>${f2(quant(a,.5))}</td><td>${f2(s)}</td><td>${f2(Math.min(...a))}</td><td>${f2(quant(a,.25))}</td><td>${f2(quant(a,.75))}</td><td>${f2(Math.max(...a))}</td><td>${f2(skew(a))}</td><td>${f2(kurtEx(a))}</td><td>${Math.abs(m)>1e-6&&c!=='Temperature_Change'?f1(s/m*100):'n/a'}</td></tr>`}).join('');
+  const c=val('stVar'),bins=+val('stBins');$('stBinsOut').textContent=bins;
+  const a=clean(D[c]),m=mean(a),s=sd(a),lo=Math.min(...a),hi=Math.max(...a),w=(hi-lo)/bins||1;
+  const cnt=Array(bins).fill(0);a.forEach(v=>{cnt[Math.min(bins-1,Math.floor((v-lo)/w))]++});
+  const ctr=cnt.map((_,i)=>lo+w*(i+.5));
+  const pdf=z=>Math.exp(-z*z/2)/Math.sqrt(2*Math.PI);
+  mk('chHist',{type:'bar',data:{labels:ctr.map(v=>v.toFixed(1)),datasets:[
+    {type:'bar',label:'Days',data:cnt,backgroundColor:alpha(css('--accent'),.75),borderRadius:2,barPercentage:1,categoryPercentage:.96,order:2},
+    {type:'line',label:'Normal curve',data:ctr.map(v=>a.length*w*pdf((v-m)/s)/s),borderColor:css('--ink'),borderWidth:2,pointRadius:0,tension:.4,order:1}
+  ]}},{scales:{x:{title:axisT(LBL[c]),ticks:{maxTicksLimit:10}},y:{title:axisT('days')}}});
+  const sk=skew(a),ku=kurtEx(a),n=a.length,jb=n/6*(sk*sk+ku*ku/4),jp=Math.exp(-jb/2);
+  $('normBox').innerHTML=`<div class="scroll"><table><tr><td>Skewness</td><td>${f2(sk)}</td></tr><tr><td>Excess kurtosis</td><td>${f2(ku)}</td></tr><tr><td>Jarque–Bera statistic</td><td>${f2(jb)}</td></tr><tr><td>p-value</td><td>${pf(jp)}</td></tr></table></div>
+  <div class="callout">${jp<0.05?`<span class="pill bad">Not normal</span> The shape departs from a normal curve at the 5% level${Math.abs(sk)>0.5?', mainly through '+(sk>0?'a long tail of high values':'a long tail of low values'):''}.`:`<span class="pill good">Close to normal</span> No significant departure from a normal curve at the 5% level.`}</div>`;
+  // Welch
+  const g1=grp(c,'Day_Type','Weekday'),g2=grp(c,'Day_Type','Weekend');
+  const m1=mean(g1),m2=mean(g2),v1=variance(g1)/g1.length,v2=variance(g2)/g2.length,se=Math.sqrt(v1+v2),t=(m1-m2)/se,df=(v1+v2)**2/(v1**2/(g1.length-1)+v2**2/(g2.length-1)),p=tpTwo(t,df),ci=tinv(.975,df)*se;
+  $('ttestBox').innerHTML=`<p class="hint">Variable: ${LBL[c]}. H₀: weekday and weekend means are equal.</p><div class="scroll"><table><tr><td>Weekday mean (n=${g1.length})</td><td>${f2(m1)}</td></tr><tr><td>Weekend mean (n=${g2.length})</td><td>${f2(m2)}</td></tr><tr><td>Difference</td><td>${sgn(m1-m2)}</td></tr><tr><td>95% CI of difference</td><td>${f2(m1-m2-ci)} to ${f2(m1-m2+ci)}</td></tr><tr><td>t (df ${df.toFixed(1)})</td><td>${f3(t)}</td></tr><tr><td>p-value</td><td>${pf(p)}</td></tr></table></div><div class="callout">${p<0.05?'<span class="pill bad">Significant</span> The data show a real weekday–weekend difference.':'<span class="pill good">Not significant</span> No evidence the weather differs between weekdays and weekends. That is what you would expect, since weather does not follow the calendar week.'}</div>`;
+  // ANOVA
+  const gs=SEASONS.map(s=>grp(c,'Season',s)),gm=mean(clean(D[c])),k=gs.length,tot=gs.reduce((q,g)=>q+g.length,0);
+  let ssb=0,ssw=0;gs.forEach(g=>{const mg=mean(g);ssb+=g.length*(mg-gm)**2;g.forEach(v=>{ssw+=(v-mg)**2})});
+  const msb=ssb/(k-1),msw=ssw/(tot-k),F=msb/msw,pa=fP(F,k-1,tot-k),eta=ssb/(ssb+ssw);
+  $('anovaBox').innerHTML=`<p class="hint">Variable: ${LBL[c]}. H₀: all four season means are equal.</p><div class="scroll"><table><tr><th>Source</th><th>SS</th><th>df</th><th>MS</th></tr><tr><td>Between seasons</td><td>${f1(ssb)}</td><td>${k-1}</td><td>${f2(msb)}</td></tr><tr><td>Within seasons</td><td>${f1(ssw)}</td><td>${tot-k}</td><td>${f2(msw)}</td></tr></table></div><div class="scroll"><table><tr><td>F statistic</td><td>${f2(F)}</td></tr><tr><td>p-value</td><td>${pf(pa)}</td></tr><tr><td>Effect size (η²)</td><td>${f3(eta)}</td></tr></table></div><div class="callout">${pa<0.05?`<span class="pill bad">Significant</span> Season explains ${(eta*100).toFixed(1)}% of the variation in ${LBL[c].replace(/ \(.*\)/,'').toLowerCase()}.`:`<span class="pill good">Not significant</span> The season means do not differ beyond chance.`}</div>`;
+}
+
+/* ---------- SAMPLING ---------- */
+let sSeed=2025;
+const rainyProp=idx=>idx.filter(i=>D.Rainfall_mm[i]>0).length/idx.length;
+function popIdx(col){const a=[];for(let i=0;i<N;i++)if(D[col][i]!=null)a.push(i);return a}
+function srsPick(arr,n,rng){const a=arr.slice();n=Math.min(n,a.length);for(let i=0;i<n;i++){const j=i+Math.floor(rng()*(a.length-i));[a[i],a[j]]=[a[j],a[i]]}return a.slice(0,n)}
+function estimate(method,n,col,conf,rng,pop){
+  const Np=pop.length,y=i=>D[col][i];let idx,m,se,df;
+  if(method==='strat'){
+    const L=SEASONS.length;idx=[];let v=0;m=0;
+    SEASONS.forEach(s=>{const sp=pop.filter(i=>D.Season[i]===s);if(!sp.length)return;const nh=Math.min(sp.length,Math.max(2,Math.round(n*sp.length/Np)));const pick=srsPick(sp,nh,rng);idx.push(...pick);const vals=pick.map(y),W=sp.length/Np;m+=W*mean(vals);v+=W*W*(1-nh/sp.length)*variance(vals)/nh});
+    se=Math.sqrt(v);df=Math.max(1,idx.length-L);
+  }else{
+    if(method==='sys'){const k=Math.max(1,Math.floor(Np/n)),st=Math.floor(rng()*k);idx=[];for(let i=0;i<n&&st+i*k<Np;i++)idx.push(pop[st+i*k])}
+    else idx=srsPick(pop,n,rng);
+    const vals=idx.map(y);m=mean(vals);se=Math.sqrt(variance(vals)/idx.length*(1-idx.length/Np));df=idx.length-1;
+  }
+  const t=tinv(1-(1-conf)/2,df);
+  return {idx,m,se,df,lo:m-t*se,hi:m+t*se,t};
+}
+function renderSampling(){
+  const method=val('sMethod'),col=val('sVar'),conf=+val('sConf'),n=+val('sN');$('sNOut').textContent=n;
+  const pop=popIdx(col),Np=pop.length,mu=mean(pop.map(i=>D[col][i]));
+  const rng=mulberry32(sSeed);
+  const e=estimate(method,n,col,conf,rng,pop);
+  const cov=e.lo<=mu&&mu<=e.hi,pct=Math.round(conf*100);
+  const tile=(k,v,s,c)=>`<div class="tile ${c||''}"><span class="k">${k}</span><span class="v" style="font-size:24px">${v}</span><span class="s">${s}</span></div>`;
+  $('sTiles').innerHTML=tile('Sample mean',f2(e.m),e.idx.length+' days sampled','hot')+tile('Standard error',f3(e.se),'df '+e.df)+tile(pct+'% interval',f2(e.lo)+' – '+f2(e.hi),'width '+f2(e.hi-e.lo))+tile('True mean (all days)',f2(mu),'population of '+Np)+`<div class="tile"><span class="k">Interval captures the truth?</span><span class="v" style="font-size:24px">${cov?'<span class="pill good">Yes</span>':'<span class="pill bad">No</span>'}</span><span class="s">${cov?'The true mean lies inside.':'This happens by design about '+(100-pct)+'% of the time.'}</span></div>`;
+  const sel=new Set(e.idx);
+  mk('chSample',{type:'line',data:{labels:D.Date,datasets:[
+    {label:'All days',data:pop.map(i=>({x:i,y:D[col][i]})),parsing:false,borderColor:alpha(css('--muted'),.5),borderWidth:1,pointRadius:0},
+    {type:'scatter',label:'Sampled days',data:e.idx.map(i=>({x:i,y:D[col][i]})),parsing:false,backgroundColor:css('--accent'),pointRadius:4.5},
+    {label:'True mean',data:[{x:0,y:mu},{x:N-1,y:mu}],parsing:false,borderColor:css('--ink'),borderDash:[6,4],borderWidth:1.5,pointRadius:0},
+    {label:'Sample mean',data:[{x:0,y:e.m},{x:N-1,y:e.m}],parsing:false,borderColor:css('--accent'),borderWidth:1.8,pointRadius:0}
+  ]}},{interaction:{mode:'nearest',intersect:true},scales:{x:{type:'linear',min:0,max:N-1,ticks:{maxTicksLimit:12,callback:v=>dlab(D.Date[Math.round(v)]||D.Date[N-1])}},y:{title:axisT(LBL[col])}},plugins:{tooltip:{callbacks:{title:items=>dlab(D.Date[items[0].parsed.x]),label:c=>c.dataset.label+': '+f1(c.parsed.y)}}}});
+  const mname={srs:'Simple random',sys:'Systematic',strat:'Stratified by season'}[method];
+  $('sNote').innerHTML=`<b>${mname} sampling.</b> `+({srs:'Every day has the same chance of selection. The standard error is s/√n, reduced by the finite population correction because the sample is a sizeable share of the year.',sys:`Starting at a random day, every ${Math.max(1,Math.floor(Np/n))}th day is taken. The sample spreads evenly across the year, which suits data with a seasonal pattern. The interval uses the simple random formula, a slightly cautious choice here.`,strat:'Each season supplies a share of the sample in proportion to its length, and the season means are combined with those weights. Removing between-season variation from the error is what shrinks the interval.'}[method]);
+  // coverage
+  const B=100,r2=mulberry32(99+n*7),res=[];let hit=0;
+  for(let b=0;b<B;b++){const q=estimate(method,n,col,conf,r2,pop);res.push(q);if(q.lo<=mu&&mu<=q.hi)hit++}
+  $('covHint').textContent=`${B} fresh samples of ${n} days, each with its own ${pct}% interval. About ${pct} of ${B} should contain the true mean.`;
+  const lo=Math.min(...res.map(q=>q.lo),mu),hi=Math.max(...res.map(q=>q.hi),mu),pad=(hi-lo)*.04,x0=lo-pad,x1=hi+pad,W=600,L=14,R=14,sx=v=>L+(v-x0)/(x1-x0)*(W-L-R);
+  let svg=`<svg viewBox="0 0 ${W} 440" width="100%" role="img" aria-label="Confidence intervals from ${B} samples; ${hit} contain the true mean">`;
+  res.forEach((q,i)=>{const ok=q.lo<=mu&&mu<=q.hi,yy=12+i*4;svg+=`<line x1="${sx(q.lo).toFixed(1)}" x2="${sx(q.hi).toFixed(1)}" y1="${yy}" y2="${yy}" stroke="${ok?css('--muted'):css('--bad')}" stroke-width="${ok?1.4:2.2}" stroke-linecap="round" opacity="${ok?.75:1}"/>`});
+  svg+=`<line x1="${sx(mu)}" x2="${sx(mu)}" y1="4" y2="416" stroke="${css('--ink')}" stroke-width="1.5" stroke-dasharray="5 4"/>`;
+  for(let k=0;k<=4;k++){const v=x0+(x1-x0)*k/4;svg+=`<text x="${sx(v).toFixed(1)}" y="434" text-anchor="middle">${v.toFixed(1)}</text>`}
+  svg+='</svg>';
+  $('covBox').innerHTML=`<div class="big">${hit} of ${B}</div><p class="hint" style="margin:4px 0 10px">intervals contain the true mean (${f2(mu)}). <span class="pill bad">red</span> marks the ones that miss.</p>`+svg;
+  // method comparison
+  const REP=1000,rows=['srs','sys','strat'].map(mt=>{const r3=mulberry32(4242),ms=[];let h=0,wsum=0;for(let b=0;b<REP;b++){const q=estimate(mt,n,col,conf,r3,pop);ms.push(q.m);wsum+=q.hi-q.lo;if(q.lo<=mu&&mu<=q.hi)h++}return {mt,bias:mean(ms)-mu,sdv:sd(ms),w:wsum/REP,cov:h/REP*100}});
+  const nm={srs:'Simple random',sys:'Systematic',strat:'Stratified'};
+  $('methTable').innerHTML='<tr><th>Method</th><th>Bias</th><th>Spread of estimates</th><th>Avg. interval width</th><th>Coverage</th></tr>'+rows.map(r=>`<tr><td>${nm[r.mt]}${r.mt===method?' <span class="pill">selected</span>':''}</td><td>${sgn(r.bias)}</td><td>${f3(r.sdv)}</td><td>${f2(r.w)}</td><td>${r.cov.toFixed(1)}%</td></tr>`).join('');
+  const best=rows.reduce((b,r)=>r.sdv<b.sdv?r:b,rows[0]);
+  $('methNote').innerHTML=`<b>${nm[best.mt]}</b> gives the most precise estimate for this variable at ${n} days. Coverage near ${pct}% means the intervals are honest. Spread is the standard deviation of the 1,000 sample means.`;
+  // proportion
+  const p=rainyProp(e.idx),nn=e.idx.length,z=zinv(1-(1-conf)/2),den=1+z*z/nn,cen=(p+z*z/(2*nn))/den,half=z*Math.sqrt(p*(1-p)/nn+z*z/(4*nn*nn))/den,P=rainyProp(Array.from({length:N},(_,i)=>i));
+  $('propBox').innerHTML=`<div class="tiles"><div class="tile"><span class="k">Sample proportion</span><span class="v">${(p*100).toFixed(1)}<small>%</small></span><span class="s">${Math.round(p*nn)} rainy of ${nn} days</span></div><div class="tile"><span class="k">${pct}% Wilson interval</span><span class="v" style="font-size:24px">${((cen-half)*100).toFixed(1)} – ${((cen+half)*100).toFixed(1)}%</span><span class="s">${P>=cen-half&&P<=cen+half?'Contains the true share':'Misses the true share'}</span></div><div class="tile"><span class="k">True share of rainy days</span><span class="v">${(P*100).toFixed(1)}<small>%</small></span><span class="s">${Math.round(P*N)} of ${N} days</span></div></div>`;
+}
+
+/* ---------- PREDICTION ---------- */
+let pdSeed=11,pdFit=null,wi={};
+const PD_TARGETS=['Temperature','Humidity','Sunshine_Hours','Rainfall_mm'];
+const PD_POOL=['Temperature','Humidity','Rainfall_mm','Wind_Speed_kmph','Pressure_hPa','Cloud_Cover_Percent','Sunshine_Hours'];
+let pdFeatSet=null;
+function pdFeatureBoxes(){
+  const t=val('pdTarget');const pool=PD_POOL.filter(f=>f!==t);
+  if(!pdFeatSet||pdFeatSet.target!==t){pdFeatSet={target:t,on:new Set(pool),season:true};wi={}}
+  $('pdFeats').innerHTML=pool.map(f=>`<label><input type="checkbox" data-f="${f}"${pdFeatSet.on.has(f)?' checked':''}>${SHORT[f]}</label>`).join('')+`<label><input type="checkbox" data-f="__season"${pdFeatSet.season?' checked':''}>Season</label>`;
+}
+function renderPrediction(){
+  const t=val('pdTarget');if(!pdFeatSet||pdFeatSet.target!==t)pdFeatureBoxes();
+  const feats=[...pdFeatSet.on],useS=pdFeatSet.season;
+  if(!feats.length&&!useS){$('pdTiles').innerHTML='<div class="callout">Pick at least one predictor.</div>';return}
+  const rng=mulberry32(pdSeed),order=Array.from({length:N},(_,i)=>i);
+  for(let i=N-1;i>0;i--){const j=Math.floor(rng()*(i+1));[order[i],order[j]]=[order[j],order[i]]}
+  const nt=Math.round(N*.2),test=order.slice(0,nt),train=order.slice(nt);
+  const cen={};feats.forEach(f=>{cen[f]=mean(train.map(i=>D[f][i]))});
+  const row=i=>[1,...feats.map(f=>D[f][i]-cen[f]),...(useS?SEASONS.slice(1).map(s=>D.Season[i]===s?1:0):[])];
+  const fit=ols(train.map(row),train.map(i=>D[t][i]));
+  const pred=i=>{const x=row(i);let s=0;for(let j=0;j<x.length;j++)s+=fit.beta[j]*x[j];return s};
+  const ytr=train.map(i=>D[t][i]),yte=test.map(i=>D[t][i]),sst=sum(ytr.map(v=>(v-mean(ytr))**2)),r2=1-fit.sse/sst,k=fit.k,adj=1-(1-r2)*(train.length-1)/(train.length-k);
+  const pte=test.map(pred);let se2=0,ae=0;pte.forEach((p,i)=>{se2+=(yte[i]-p)**2;ae+=Math.abs(yte[i]-p)});
+  const rmse=Math.sqrt(se2/nt),mae=ae/nt,mte=mean(yte),r2te=1-se2/sum(yte.map(v=>(v-mte)**2));
+  pdFit={fit,cen,feats,useS,t,train};
+  const tile=(a,b,c,h)=>`<div class="tile ${h||''}"><span class="k">${a}</span><span class="v" style="font-size:26px">${b}</span><span class="s">${c}</span></div>`;
+  $('pdTiles').innerHTML=tile('R² on unseen days',f3(r2te),'training R² '+f3(r2)+' · adj. '+f3(adj),'hot')+tile('RMSE (unseen)',f2(rmse),'typical error, '+(LBL[t].match(/\((.*)\)/)||['',''])[1])+tile('MAE (unseen)',f2(mae),'average absolute error')+tile('Split',train.length+' / '+nt,'train / test days');
+  const dmin=Math.min(...yte,...pte),dmax=Math.max(...yte,...pte);
+  mk('chPred',{type:'scatter',data:{datasets:[{label:'Test days',data:yte.map((v,i)=>({x:v,y:pte[i]})),backgroundColor:alpha(css('--accent'),.75),pointRadius:4},{type:'line',label:'Perfect prediction',data:[{x:dmin,y:dmin},{x:dmax,y:dmax}],borderColor:css('--ink'),borderDash:[6,4],borderWidth:1.5,pointRadius:0}]}},
+    {interaction:{mode:'nearest',intersect:true},plugins:{tooltip:{callbacks:{title:()=>'',label:c=>c.dataset.label==='Perfect prediction'?'Perfect prediction':'Actual '+f1(c.parsed.x)+' · predicted '+f1(c.parsed.y)}}},scales:{x:{type:'linear',title:axisT('Actual '+LBL[t])},y:{title:axisT('Predicted')}}});
+  const names=['Intercept (average conditions)',...feats.map(f=>LBL[f]),...(useS?SEASONS.slice(1).map(s=>'Season: '+s+' vs Winter'):[])];
+  const sdy=sd(ytr);
+  $('pdCoef').innerHTML='<tr><th>Term</th><th>Coef.</th><th>Std. err.</th><th>t</th><th>p</th><th>Std. beta</th></tr>'+names.map((nme,j)=>{const b=fit.beta[j],s=fit.se[j],tt=b/s,p=tpTwo(tt,fit.df);const sb=j>=1&&j<=feats.length?f2(b*sd(train.map(i=>D[feats[j-1]][i]))/sdy):'';return `<tr><td>${nme}</td><td>${b.toFixed(3)}</td><td>${s.toFixed(3)}</td><td>${f2(tt)}</td><td>${pf(p)}</td><td>${sb}</td></tr>`}).join('');
+  buildWhatIf();
+}
+function buildWhatIf(){
+  const {feats,useS,cen,train}=pdFit;
+  let h=feats.map(f=>{const a=clean(D[f]),mn=Math.min(...a),mx=Math.max(...a),st=(mx-mn)/100;if(wi[f]===undefined)wi[f]=+cen[f].toFixed(1);return `<div class="ctl"><label for="wi_${f}">${SHORT[f]} <output id="wo_${f}"></output></label><input type="range" id="wi_${f}" data-f="${f}" min="${mn}" max="${mx}" step="${st}" value="${wi[f]}"></div>`}).join('');
+  if(useS){if(!wi.__s)wi.__s='Winter';h+=`<div class="ctl"><label for="wi_season">Season</label><select id="wi_season">${SEASONS.map(s=>`<option${s===wi.__s?' selected':''}>${s}</option>`).join('')}</select></div>`}
+  $('wiBox').innerHTML=h;updateWhatIf();
+}
+function updateWhatIf(){
+  if(!pdFit)return;const {fit,cen,feats,useS,t}=pdFit;
+  const x=[1,...feats.map(f=>wi[f]-cen[f]),...(useS?SEASONS.slice(1).map(s=>wi.__s===s?1:0):[])];
+  feats.forEach(f=>{const o=$('wo_'+f);if(o)o.textContent=(+wi[f]).toFixed(1)});
+  let yh=0;for(let j=0;j<x.length;j++)yh+=fit.beta[j]*x[j];
+  let q=0;for(let a=0;a<x.length;a++)for(let b=0;b<x.length;b++)q+=x[a]*fit.iv[a][b]*x[b];
+  const half=tinv(.975,fit.df)*Math.sqrt(fit.s2*(1+q));
+  $('wiOut').innerHTML=`<div class="big">${yh.toFixed(1)} <span style="font-size:18px;color:var(--muted)">predicted ${LBL[t]}</span></div><div class="callout">95% prediction interval: <b>${(yh-half).toFixed(1)} to ${(yh+half).toFixed(1)}</b>. About 19 in 20 real days under these conditions should land in this range, if the pattern in 2025 holds.</div>`;
+}
+function renderForecast(){
+  const y=D.Temperature,split=Math.floor(N*.8),p=3,rows=[];for(let t=p;t<split;t++)rows.push(t);
+  const fit=ols(rows.map(t=>[1,y[t-1],y[t-2],y[t-3]]),rows.map(t=>y[t]));
+  const ar=t=>fit.beta[0]+fit.beta[1]*y[t-1]+fit.beta[2]*y[t-2]+fit.beta[3]*y[t-3];
+  const clim=mean(y.slice(0,split));
+  const models=[['Yesterday repeats',t=>y[t-1]],['7-day average',t=>mean(y.slice(t-7,t))],['Autoregressive (3 lags)',ar],['Training-period mean',()=>clim]];
+  const tt=[];for(let t=split;t<N;t++)tt.push(t);
+  const res=models.map(([nm,fn])=>{let s=0,a=0;tt.forEach(t=>{const e=y[t]-fn(t);s+=e*e;a+=Math.abs(e)});return {nm,rmse:Math.sqrt(s/tt.length),mae:a/tt.length}});
+  const best=res.reduce((b,r)=>r.rmse<b.rmse?r:b,res[0]);
+  $('fcTable').innerHTML='<tr><th>Model</th><th>RMSE</th><th>MAE</th></tr>'+res.map(r=>`<tr><td>${r.nm}${r===best?' <span class="pill good">best</span>':''}</td><td>${f2(r.rmse)}</td><td>${f2(r.mae)}</td></tr>`).join('');
+  mk('chFc',{type:'line',data:{labels:tt.map(t=>D.Date[t]),datasets:[
+    {label:'Actual',data:tt.map(t=>y[t]),borderColor:css('--ink'),borderWidth:2,pointRadius:0},
+    {label:'Autoregressive forecast',data:tt.map(ar),borderColor:css('--accent'),borderWidth:2,pointRadius:0,borderDash:[5,3]},
+    {label:'Yesterday repeats',data:tt.map(t=>y[t-1]),borderColor:css('--cool'),borderWidth:1.3,pointRadius:0,hidden:true}
+  ]}},{scales:{x:{ticks:dateTicks()},y:{title:axisT('°C')}}});
+  const x=[1,y[N-1],y[N-2],y[N-3]];let yh=0,q=0;for(let a=0;a<4;a++){yh+=fit.beta[a]*x[a];for(let b=0;b<4;b++)q+=x[a]*fit.iv[a][b]*x[b]}
+  const half=tinv(.975,fit.df)*Math.sqrt(fit.s2*(1+q));
+  $('fcNote').innerHTML=`<b>Forecast for 1 Jan 2026:</b> ${yh.toFixed(1)} °C (95% interval ${(yh-half).toFixed(1)} to ${(yh+half).toFixed(1)}). The model uses only the last three days, so it knows nothing about the season. The coefficients on the three lags are ${fit.beta.slice(1).map(f3).join(', ')}.`;
+}
+
+/* ---------- init & routing ---------- */
+const VIEWS={overview:renderOverview,trends:renderTrends,seasons:renderSeasons,relationships:renderRel,statistics:renderStats,sampling:renderSampling,prediction:()=>{renderPrediction();renderForecast()}};
+let cur='overview';
+function show(name){
+  if(!VIEWS[name])name='overview';cur=name;
+  Object.keys(VIEWS).forEach(k=>{$('v-'+k).hidden=k!==name});
+  document.querySelectorAll('#tabs a').forEach(a=>{if(a.getAttribute('href')==='#'+name)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current')});
+  try{VIEWS[name]()}catch(err){console.error(err);const v=$('v-'+name);const d=document.createElement('div');d.className='callout';d.textContent='This section could not be drawn: '+err.message;v.appendChild(d)}
+}
+function init(){
+  Chart.defaults.font.family=css('--font-body')||'sans-serif';
+  const dailyVars=NUM;
+  fill('trVar',dailyVars,'Temperature');fill('seVar',dailyVars.filter(c=>c!=='Temperature_Change'),'Temperature');
+  fill('scX',NUM,'Cloud_Cover_Percent');fill('scY',NUM,'Sunshine_Hours');
+  fill('stVar',NUM,'Temperature');fill('sVar',NUM.filter(c=>c!=='Temperature_Change'),'Temperature');
+  fill('pdTarget',PD_TARGETS,'Temperature');pdFeatureBoxes();
+  ['trVar','trWin'].forEach(i=>$(i).addEventListener('change',renderTrends));
+  $('seVar').addEventListener('change',renderSeasons);
+  ['scX','scY'].forEach(i=>$(i).addEventListener('change',renderScatter));
+  ['stVar'].forEach(i=>$(i).addEventListener('change',renderStats));$('stBins').addEventListener('input',renderStats);
+  ['sMethod','sVar','sConf'].forEach(i=>$(i).addEventListener('change',renderSampling));$('sN').addEventListener('input',renderSampling);
+  $('sDraw').addEventListener('click',()=>{sSeed+=1;renderSampling()});
+  $('pdTarget').addEventListener('change',()=>{pdFeatureBoxes();renderPrediction()});
+  $('pdSplit').addEventListener('click',()=>{pdSeed+=1;renderPrediction()});
+  $('pdFeats').addEventListener('change',e=>{const f=e.target.dataset.f;if(f==='__season')pdFeatSet.season=e.target.checked;else if(e.target.checked)pdFeatSet.on.add(f);else pdFeatSet.on.delete(f);renderPrediction()});
+  $('wiBox').addEventListener('input',e=>{const t=e.target;if(t.id==='wi_season')wi.__s=t.value;else if(t.dataset.f)wi[t.dataset.f]=+t.value;updateWhatIf()});
+  window.addEventListener('hashchange',()=>show(location.hash.slice(1)));
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>show(cur));
+  new MutationObserver(()=>show(cur)).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+  show(location.hash.slice(1)||'overview');
+}
+if(document.fonts&&document.fonts.ready){document.fonts.ready.then(init,init)}else init();
+</script>
+
+</body></html>
